@@ -242,6 +242,24 @@ describe("recommendCreators", () => {
     expect(result.sections[0].items[0].creator.creatorId).toBe("KNOWN");
   });
 
+  it("비용 미상 후보만 있으면 예산 기반 추천에서 제외한다", () => {
+    const result = recommendCreators(
+      [
+        creator("UNKNOWN", {
+          totalCampaignCount: 0,
+          totalCampaignBudgetKrw: 0,
+          avgCampaignBudgetKrw: null,
+          advertiserRating: null,
+        }),
+      ],
+      query(1_500_000),
+    );
+
+    expect(result.outcome).toBe("empty");
+    expect(result.sections).toEqual([]);
+    expect(result.attemptedRelaxations).not.toContain("unknown-cost");
+  });
+
   it("총예산을 초과하는 후보는 별도 완화 없이 제외한다", () => {
     const exact = recommendCreators(
       [creator("IN", { avgCampaignBudgetKrw: 120 })],
@@ -280,7 +298,7 @@ describe("recommendCreators", () => {
 
     expect(result.outcome).toBe("empty");
     expect(result.sections).toEqual([]);
-    expect(result.attemptedRelaxations).toHaveLength(2);
+    expect(result.attemptedRelaxations).toEqual(["adjacent-segment"]);
   });
 
   it("추천 인원과 총예산이 모두 없으면 요청을 거절한다", () => {
@@ -319,12 +337,9 @@ describe("recommendCreators", () => {
     )).toBeLessThanOrEqual(1_500_000);
     expect(exactItems.length).toBeGreaterThan(1);
 
-    const exploration = recommendCreators(creators, query(1, ["패션"]));
-    expect(exploration.outcome).toBe("exploration");
-    expect(exploration.sections[0].items[0]).toMatchObject({
-      creator: { creatorId: "C0011" },
-      score: 45.4,
-    });
+    const noPricedCandidate = recommendCreators(creators, query(1, ["패션"]));
+    expect(noPricedCandidate.outcome).toBe("empty");
+    expect(noPricedCandidate.sections).toEqual([]);
 
     const relaxed = recommendCreators(creators, query(3_000_000, ["게임"], "macro"));
     expect(relaxed.outcome).toBe("segment-relaxed");

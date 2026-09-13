@@ -649,33 +649,13 @@ export function recommendCreators(
     };
   }
 
-  const exploration = query.totalBudgetKrw === null
-    ? []
-    : sameSegment.filter((creator) => creator.avgCampaignBudgetKrw === null);
-  if (exploration.length > 0) {
-    const explorationLimit = query.desiredCreatorCount ?? exploration.length;
-    const explorationItems = sortRecommendations(
-      exploration.map((creator) => score(creator, "exploration")),
-      "recommended",
-    ).slice(0, explorationLimit);
-    return {
-      appliedQuery,
-      outcome: "exploration",
-      sections: [makeSection("exploration", explorationItems, query.segment ?? undefined)],
-      attemptedRelaxations: ["adjacent-segment", "unknown-cost"],
-      diagnostics: [
-        "총예산 충족 여부를 확인할 수 있는 후보가 없어 견적 확인이 필요한 탐색 후보를 보여드려요.",
-      ],
-    };
-  }
-
   return {
     appliedQuery,
     outcome: "empty",
     sections: [],
-    attemptedRelaxations: ["adjacent-segment", "unknown-cost"],
+    attemptedRelaxations: ["adjacent-segment"],
     diagnostics: [
-      "선택한 플랫폼·카테고리·규모에서 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 플랫폼, 규모 또는 카테고리를 변경해 주세요.",
+      "선택한 플랫폼·카테고리·규모에서 비용이 확인되고 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 플랫폼, 규모 또는 카테고리를 변경해 주세요.",
     ],
   };
 }

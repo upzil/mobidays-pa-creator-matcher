@@ -85,23 +85,21 @@ export function ResultsPanel({
     (creator) => !recommendedIds.has(creator.creatorId),
   );
   const selectedItems = sections.flatMap((section) => section.items);
-  const hasUnknownCost = selectedItems.some(
-    (item) => item.creator.avgCampaignBudgetKrw === null,
+  const selectedCosts = selectedItems.map((item) => item.creator.avgCampaignBudgetKrw);
+  const hasOnlyKnownCosts = selectedCosts.every(
+    (cost): cost is number => cost !== null,
   );
-  const usedBudgetKrw = selectedItems.reduce(
-    (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
-    0,
-  );
-  const budgetStatus = result.appliedQuery.totalBudgetKrw === null
+  const usedBudgetKrw = hasOnlyKnownCosts
+    ? selectedCosts.reduce((sum, cost) => sum + cost, 0)
+    : null;
+  const budgetStatus = result.appliedQuery.totalBudgetKrw === null || usedBudgetKrw === null
     ? null
-    : hasUnknownCost
-      ? { used: "확인 필요", remaining: "확인 필요" }
-      : {
-          used: currencyFormatter.format(usedBudgetKrw),
-          remaining: currencyFormatter.format(
-            Math.max(0, result.appliedQuery.totalBudgetKrw - usedBudgetKrw),
-          ),
-        };
+    : {
+        used: currencyFormatter.format(usedBudgetKrw),
+        remaining: currencyFormatter.format(
+          Math.max(0, result.appliedQuery.totalBudgetKrw - usedBudgetKrw),
+        ),
+      };
 
   return (
     <div className="results-content">

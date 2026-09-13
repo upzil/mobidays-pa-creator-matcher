@@ -147,6 +147,6 @@ export interface RecommendationResult {
   appliedQuery: RecommendationQuery;
   outcome: RecommendationOutcome;
   sections: RecommendationSection[];
-  attemptedRelaxations: Array<"adjacent-segment" | "unknown-cost">;
+  attemptedRelaxations: Array<"adjacent-segment">;
   diagnostics: string[];
 }
