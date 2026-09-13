@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+coverage/
+*.log
+
+# Local project coordination files
+AGENTS.md
+PROJECT_PLAN.md
+PROJECT_STATUS.md
