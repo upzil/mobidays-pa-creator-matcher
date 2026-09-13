@@ -185,7 +185,7 @@ export function ResultsPanel({
       ) : (
         <>
           <section className="empty-state" aria-labelledby="empty-title">
-            <h3 id="empty-title">카테고리를 유지한 대안도 찾지 못했어요.</h3>
+            <h3 id="empty-title">조건에 맞는 추천 후보를 찾지 못했어요.</h3>
             <p>{result.diagnostics[0] ?? "예산을 높이거나 크리에이터 규모 또는 카테고리를 바꿔 다시 찾아보세요."}</p>
             <div className="recovery-actions" aria-label="조건 수정 바로가기">
               <button type="button" onClick={onFocusBudget}>예산 조정하기</button>
