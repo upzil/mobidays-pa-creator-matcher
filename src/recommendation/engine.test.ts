@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { parseCreatorsCsv } from "../data/creatorCsv";
-import type { CampaignGoal, Category, Creator, FollowerSegment } from "../domain/types";
-import { CAMPAIGN_GOAL_PROFILES } from "./goals";
+import type { Category, Creator, FollowerSegment } from "../domain/types";
+import { getCampaignGoalProfile } from "./goals";
 import {
   getFollowerSegment,
   recommendCreators,
@@ -36,10 +36,10 @@ function query(
   totalBudgetKrw: number | null,
   categories: Category[] = ["게임"],
   segment: FollowerSegment | null = "nano",
-  goal: CampaignGoal = "balanced",
+  goalPosition = 50,
   desiredCreatorCount: number | null = null,
 ) {
-  return { totalBudgetKrw, categories, segment, goal, desiredCreatorCount } as const;
+  return { totalBudgetKrw, categories, segment, goalPosition, desiredCreatorCount } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -65,13 +65,13 @@ describe("recommendCreators", () => {
 
     const result = recommendCreators(
       candidates,
-      query(null, [], null),
+      query(10_000_000, [], null),
     );
 
     expect(result.outcome).toBe("exact");
     expect(result.sections.flatMap(({ items }) => items)).toHaveLength(8);
     expect(result.appliedQuery).toMatchObject({
-      totalBudgetKrw: null,
+      totalBudgetKrw: 10_000_000,
       categories: [],
       segment: null,
       desiredCreatorCount: null,
@@ -90,7 +90,7 @@ describe("recommendCreators", () => {
           advertiserRating: null,
         }),
       ],
-      query(600_000, ["게임"], "nano", "balanced", 2),
+      query(600_000, ["게임"], "nano", 50, 2),
     );
 
     expect(result.sections).toHaveLength(1);
@@ -112,7 +112,7 @@ describe("recommendCreators", () => {
 
     const result = recommendCreators(
       candidates,
-      query(600_000, ["게임"], "nano", "balanced", 2),
+      query(600_000, ["게임"], "nano", 50, 2),
     );
     const selected = result.sections.flatMap(({ items }) => items);
 
@@ -162,23 +162,32 @@ describe("recommendCreators", () => {
 
     const awareness = recommendCreators(
       candidates,
-      query(1_500_000, ["게임"], "nano", "awareness"),
+      query(1_500_000, ["게임"], "nano", 0),
     );
-    const conversion = recommendCreators(
+    const engagement = recommendCreators(
       candidates,
-      query(1_500_000, ["게임"], "nano", "conversion"),
+      query(1_500_000, ["게임"], "nano", 100),
     );
 
     expect(awareness.sections[0].items[0].creator.creatorId).toBe("REACH");
-    expect(conversion.sections[0].items[0].creator.creatorId).toBe("CONVERT");
+    expect(engagement.sections[0].items[0].creator.creatorId).toBe("CONVERT");
     expect(awareness.sections[0].items[0].breakdown.views.weight).toBe(0.45);
-    expect(conversion.sections[0].items[0].breakdown.rating.weight).toBe(0.3);
+    expect(engagement.sections[0].items[0].breakdown.engagement.weight).toBe(0.45);
   });
 
-  it("모든 캠페인 목적의 가중치 합이 100%다", () => {
-    for (const profile of Object.values(CAMPAIGN_GOAL_PROFILES)) {
+  it("슬라이더 전 구간의 가중치 합이 100%다", () => {
+    for (const position of [0, 25, 50, 75, 100]) {
+      const profile = getCampaignGoalProfile(position);
       expect(Object.values(profile.weights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1);
     }
+
+    expect(getCampaignGoalProfile(75).weights).toEqual({
+      engagement: 0.375,
+      views: 0.225,
+      rating: 0.175,
+      experience: 0.125,
+      budgetEfficiency: 0.1,
+    });
   });
 
   it("예산 equality와 복수 카테고리 OR를 정확 일치로 처리한다", () => {
@@ -217,11 +226,11 @@ describe("recommendCreators", () => {
   it("총예산을 초과하는 후보는 별도 완화 없이 제외한다", () => {
     const exact = recommendCreators(
       [creator("IN", { avgCampaignBudgetKrw: 120 })],
-      query(120, ["게임"], "nano", "balanced", 1),
+      query(120, ["게임"], "nano", 50, 1),
     );
     const over = recommendCreators(
       [creator("OUT", { avgCampaignBudgetKrw: 121 })],
-      query(120, ["게임"], "nano", "balanced", 1),
+      query(120, ["게임"], "nano", 50, 1),
     );
 
     expect(exact.outcome).toBe("exact");
@@ -253,6 +262,12 @@ describe("recommendCreators", () => {
     expect(result.outcome).toBe("empty");
     expect(result.sections).toEqual([]);
     expect(result.attemptedRelaxations).toHaveLength(2);
+  });
+
+  it("추천 인원과 총예산이 모두 없으면 요청을 거절한다", () => {
+    expect(() => recommendCreators([creator("C1")], query(null))).toThrow(
+      "totalBudgetKrw와 desiredCreatorCount 중 하나는 필수입니다.",
+    );
   });
 
   it("입력 순서와 반복 실행에 무관하며 원본을 변경하지 않는다", () => {
@@ -313,7 +328,7 @@ describe("sortRecommendations", () => {
           advertiserRating: null,
         }),
       ],
-      query(null),
+      query(null, ["게임"], "nano", 50, 2),
     );
     const items = result.sections.flatMap(({ items }) => items);
     const original = [...items];

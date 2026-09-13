@@ -1,6 +1,6 @@
-import type { CampaignGoal, ScoreWeights } from "../domain/types";
+import type { ScoreWeights } from "../domain/types";
 
-interface CampaignGoalProfile {
+export interface CampaignGoalProfile {
   label: string;
   description: string;
   scoringNote: string;
@@ -8,7 +8,13 @@ interface CampaignGoalProfile {
   weights: ScoreWeights;
 }
 
-export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoal, CampaignGoalProfile> = {
+type CampaignGoalAnchor = "awareness" | "balanced" | "engagement";
+
+export const CAMPAIGN_GOAL_MIN = 0;
+export const CAMPAIGN_GOAL_BALANCED = 50;
+export const CAMPAIGN_GOAL_MAX = 100;
+
+export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProfile> = {
   awareness: {
     label: "노출 확대",
     description: "평균 조회수를 중심으로 실제 도달 가능성을 봐요.",
@@ -20,32 +26,6 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoal, CampaignGoalProfile> =
       rating: 0.15,
       experience: 0.1,
       budgetEfficiency: 0.1,
-    },
-  },
-  engagement: {
-    label: "참여 유도",
-    description: "참여율을 중심으로 반응 가능성을 봐요.",
-    scoringNote: "참여 목적에 맞춰 참여율을 가장 크게 반영했어요.",
-    weightSummary: "참여율 45% · 조회수 20% · 평점 15% · 경험 10% · 예산 10%",
-    weights: {
-      engagement: 0.45,
-      views: 0.2,
-      rating: 0.15,
-      experience: 0.1,
-      budgetEfficiency: 0.1,
-    },
-  },
-  conversion: {
-    label: "전환 중심",
-    description: "평점·참여율·협업 경험을 전환 대리 지표로 봐요.",
-    scoringNote: "직접 전환 데이터가 없어 평점·참여율·협업 경험을 대리 지표로 반영했어요.",
-    weightSummary: "평점 30% · 참여율 25% · 경험 20% · 예산 15% · 조회수 10%",
-    weights: {
-      engagement: 0.25,
-      views: 0.1,
-      rating: 0.3,
-      experience: 0.2,
-      budgetEfficiency: 0.15,
     },
   },
   balanced: {
@@ -61,6 +41,90 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoal, CampaignGoalProfile> =
       budgetEfficiency: 0.1,
     },
   },
+  engagement: {
+    label: "참여 중심",
+    description: "참여율을 중심으로 반응 가능성을 봐요.",
+    scoringNote: "참여 중심 설정에 맞춰 참여율을 가장 크게 반영했어요.",
+    weightSummary: "참여율 45% · 조회수 20% · 평점 15% · 경험 10% · 예산 10%",
+    weights: {
+      engagement: 0.45,
+      views: 0.2,
+      rating: 0.15,
+      experience: 0.1,
+      budgetEfficiency: 0.1,
+    },
+  },
 };
 
-export const CAMPAIGN_GOALS = Object.keys(CAMPAIGN_GOAL_PROFILES) as CampaignGoal[];
+function interpolateWeights(
+  from: ScoreWeights,
+  to: ScoreWeights,
+  progress: number,
+): ScoreWeights {
+  return {
+    engagement: from.engagement + (to.engagement - from.engagement) * progress,
+    views: from.views + (to.views - from.views) * progress,
+    rating: from.rating + (to.rating - from.rating) * progress,
+    experience: from.experience + (to.experience - from.experience) * progress,
+    budgetEfficiency:
+      from.budgetEfficiency + (to.budgetEfficiency - from.budgetEfficiency) * progress,
+  };
+}
+
+function formatPercent(value: number): string {
+  const percent = Math.round(value * 1_000) / 10;
+  return Number.isInteger(percent) ? `${percent}%` : `${percent.toFixed(1)}%`;
+}
+
+function summarizeWeights(weights: ScoreWeights): string {
+  const entries = [
+    { label: "참여율", value: weights.engagement },
+    { label: "조회수", value: weights.views },
+    { label: "평점", value: weights.rating },
+    { label: "경험", value: weights.experience },
+    { label: "예산", value: weights.budgetEfficiency },
+  ].sort((a, b) => b.value - a.value);
+
+  return entries.map(({ label, value }) => `${label} ${formatPercent(value)}`).join(" · ");
+}
+
+export function getCampaignGoalProfile(position: number): CampaignGoalProfile {
+  const clampedPosition = Math.min(CAMPAIGN_GOAL_MAX, Math.max(CAMPAIGN_GOAL_MIN, position));
+  let weights: ScoreWeights;
+  let label: string;
+  let description: string;
+  let scoringNote: string;
+
+  if (clampedPosition < CAMPAIGN_GOAL_BALANCED) {
+    weights = interpolateWeights(
+      CAMPAIGN_GOAL_PROFILES.awareness.weights,
+      CAMPAIGN_GOAL_PROFILES.balanced.weights,
+      clampedPosition / CAMPAIGN_GOAL_BALANCED,
+    );
+    label = "노출 중심";
+    description = "평균 조회수 비중을 높여 더 넓은 도달 가능성을 봐요.";
+    scoringNote = "노출 쪽으로 조절한 수준에 맞춰 조회수 비중을 높였어요.";
+  } else if (clampedPosition > CAMPAIGN_GOAL_BALANCED) {
+    weights = interpolateWeights(
+      CAMPAIGN_GOAL_PROFILES.balanced.weights,
+      CAMPAIGN_GOAL_PROFILES.engagement.weights,
+      (clampedPosition - CAMPAIGN_GOAL_BALANCED) / CAMPAIGN_GOAL_BALANCED,
+    );
+    label = "참여 중심";
+    description = "참여율 비중을 높여 더 적극적인 반응 가능성을 봐요.";
+    scoringNote = "참여 쪽으로 조절한 수준에 맞춰 참여율 비중을 높였어요.";
+  } else {
+    weights = CAMPAIGN_GOAL_PROFILES.balanced.weights;
+    label = CAMPAIGN_GOAL_PROFILES.balanced.label;
+    description = CAMPAIGN_GOAL_PROFILES.balanced.description;
+    scoringNote = CAMPAIGN_GOAL_PROFILES.balanced.scoringNote;
+  }
+
+  return {
+    label,
+    description,
+    scoringNote,
+    weightSummary: summarizeWeights(weights),
+    weights,
+  };
+}

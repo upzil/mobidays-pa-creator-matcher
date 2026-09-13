@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -64,7 +64,7 @@ describe("App", () => {
   it("데이터를 불러온 뒤 전체 크리에이터와 기본 정렬을 제공한다", async () => {
     render(<App />);
 
-    expect(screen.getByRole("status")).toHaveTextContent("데이터를 확인");
+    expect(screen.getByText("크리에이터 데이터를 확인하고 있어요.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "전체 크리에이터 3명" })).toBeInTheDocument();
     expect(screen.getByLabelText("전체 목록 정렬")).toHaveValue("followers");
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
@@ -74,9 +74,11 @@ describe("App", () => {
     ]);
     expect(screen.getByLabelText("총 예산")).toBeEnabled();
     expect(screen.getByLabelText("추천 인원")).toHaveValue(null);
-    expect(screen.getByLabelText("캠페인 목적")).toHaveValue("balanced");
+    expect(screen.getByLabelText("캠페인 목적")).toHaveValue("50");
     expect(screen.getByLabelText(/크리에이터 규모/)).toHaveValue("");
     expect(screen.getByText("전체 카테고리")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("추천 결과")).queryByText("나노")).not.toBeInTheDocument();
+    expect(screen.queryByText("ALL CREATORS")).not.toBeInTheDocument();
   });
 
   it("추천 전 전체 목록을 기본 지표로 재정렬한다", async () => {
@@ -93,11 +95,12 @@ describe("App", () => {
     ]);
   });
 
-  it("추천 인원을 비우면 전체 후보를 인원 제한 없이 추천한다", async () => {
+  it("추천 인원을 입력하면 예산 없이 해당 인원까지 추천한다", async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
+    await user.type(screen.getByLabelText("추천 인원"), "3");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
@@ -129,7 +132,7 @@ describe("App", () => {
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
     expect(screen.getByText("균형 탐색")).toBeInTheDocument();
-    expect(screen.getByText(/참여율 30% · 조회수 25%/)).toBeInTheDocument();
+    expect(screen.getAllByText(/참여율 30% · 조회수 25%/)).toHaveLength(2);
 
     await user.type(screen.getByLabelText("총 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
@@ -141,20 +144,21 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
-    await user.selectOptions(screen.getByLabelText("캠페인 목적"), "awareness");
+    fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "0" } });
     await user.type(screen.getByLabelText("총 예산"), "150");
     await user.click(screen.getByText("전체 카테고리"));
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
     await user.selectOptions(screen.getByLabelText(/크리에이터 규모/), "nano");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByText(/조회수 45% · 참여율 20%/)).toBeInTheDocument();
+    expect(await screen.findByText(/노출 쪽으로 조절한 수준/)).toBeInTheDocument();
+    expect(screen.getAllByText(/조회수 45% · 참여율 20%/)).toHaveLength(2);
 
-    await user.selectOptions(screen.getByLabelText("캠페인 목적"), "conversion");
+    fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "100" } });
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByText(/평점 30% · 참여율 25%/)).toBeInTheDocument();
-    expect(screen.getByText(/직접 전환 데이터가 없어/)).toBeInTheDocument();
+    expect(await screen.findByText(/참여 쪽으로 조절한 수준/)).toBeInTheDocument();
+    expect(screen.getAllByText(/참여율 45% · 조회수 20%/)).toHaveLength(2);
   });
 
   it("추천 인원으로 노출 후보 수를 제한한다", async () => {
@@ -181,6 +185,19 @@ describe("App", () => {
     expect(screen.getByText("추천 인원은 1명에서 20명 사이로 입력해 주세요.")).toBeInTheDocument();
     expect(countInput).toHaveFocus();
     expect(screen.queryByRole("heading", { name: /명의 후보를 찾았어요/ })).not.toBeInTheDocument();
+  });
+
+  it("추천 인원과 총예산을 모두 비우면 안내하고 추천 인원으로 초점을 옮긴다", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+
+    const countInput = screen.getByLabelText("추천 인원");
+    await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
+
+    expect(screen.getByText("추천 인원 또는 총예산 중 하나를 입력해 주세요.")).toBeInTheDocument();
+    expect(countInput).toHaveFocus();
+    expect(screen.queryByRole("heading", { name: "조건에 맞는 추천" })).not.toBeInTheDocument();
   });
 
   it("CSV 로드 오류에서 다시 불러올 수 있다", async () => {

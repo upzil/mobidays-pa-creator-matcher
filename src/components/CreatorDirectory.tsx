@@ -1,4 +1,4 @@
-import type { BrowseSortMode, Creator, FollowerSegment } from "../domain/types";
+import type { BrowseSortMode, Creator } from "../domain/types";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const currencyFormatter = new Intl.NumberFormat("ko-KR", {
@@ -6,12 +6,6 @@ const currencyFormatter = new Intl.NumberFormat("ko-KR", {
   currency: "KRW",
   maximumFractionDigits: 0,
 });
-
-const segmentLabels: Record<FollowerSegment, string> = {
-  nano: "나노",
-  micro: "마이크로",
-  macro: "매크로",
-};
 
 const browseSortOptions: Array<{ value: BrowseSortMode; label: string }> = [
   { value: "followers", label: "팔로워 많은 순" },
@@ -26,7 +20,6 @@ interface CreatorDirectoryProps {
   excludedRows: number;
   sortMode: BrowseSortMode;
   onSortChange: (mode: BrowseSortMode) => void;
-  eyebrow?: string;
   heading?: string;
   description?: string;
 }
@@ -42,7 +35,6 @@ export function CreatorDirectory({
   excludedRows,
   sortMode,
   onSortChange,
-  eyebrow = "ALL CREATORS",
   heading = `전체 크리에이터 ${creators.length}명`,
   description = "추천 조건을 입력하기 전에도 주요 지표를 비교할 수 있어요.",
 }: CreatorDirectoryProps) {
@@ -50,7 +42,6 @@ export function CreatorDirectory({
     <div className="directory-content">
       <header className="directory-heading">
         <div>
-          <p className="eyebrow">{eyebrow}</p>
           <h2>{heading}</h2>
           <p>{description}</p>
         </div>
@@ -92,7 +83,7 @@ export function CreatorDirectory({
                 </span>
                 <div>
                   <h3 id={`directory-${creator.creatorId}`}>{creator.creatorName}</h3>
-                  <p>{creator.category} · {creator.platform} · {segmentLabels[creator.segment]}</p>
+                  <p>{creator.category} · {creator.platform}</p>
                 </div>
               </div>
               <dl className="directory-metrics">

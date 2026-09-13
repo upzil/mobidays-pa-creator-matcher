@@ -4,7 +4,6 @@ import { ResultsPanel } from "./components/ResultsPanel";
 import { loadCreators } from "./data/creatorCsv";
 import type {
   BrowseSortMode,
-  CampaignGoal,
   Category,
   Creator,
   FollowerSegment,
@@ -20,7 +19,7 @@ const initialDraft: CampaignDraft = {
   budgetManwon: "",
   categories: [],
   segment: "",
-  goal: "balanced",
+  goalPosition: 50,
   desiredCreatorCount: "",
 };
 
@@ -43,6 +42,9 @@ function validateDraft(draft: CampaignDraft): FormErrors {
   ) {
     errors.desiredCreatorCount = "추천 인원은 1명에서 20명 사이로 입력해 주세요.";
   }
+  if (draft.budgetManwon === "" && draft.desiredCreatorCount === "") {
+    errors.countOrBudget = "추천 인원 또는 총예산 중 하나를 입력해 주세요.";
+  }
   return errors;
 }
 
@@ -51,7 +53,7 @@ function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | nu
   return (
     (draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000) === query.totalBudgetKrw &&
     (draft.segment || null) === query.segment &&
-    draft.goal === query.goal &&
+    draft.goalPosition === query.goalPosition &&
     (draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount)) === query.desiredCreatorCount &&
     draft.categories.length === query.categories.length &&
     draft.categories.every((category) => query.categories.includes(category))
@@ -72,7 +74,7 @@ function App() {
   const [reloadToken, setReloadToken] = useState(0);
   const budgetRef = useRef<HTMLInputElement>(null);
   const desiredCreatorCountRef = useRef<HTMLInputElement>(null);
-  const goalRef = useRef<HTMLSelectElement>(null);
+  const goalRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
   const segmentRef = useRef<HTMLSelectElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
@@ -131,7 +133,7 @@ function App() {
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      if (nextErrors.desiredCreatorCount) desiredCreatorCountRef.current?.focus();
+      if (nextErrors.desiredCreatorCount || nextErrors.countOrBudget) desiredCreatorCountRef.current?.focus();
       else if (nextErrors.budget) budgetRef.current?.focus();
       setAnnouncement("입력한 조건을 확인해 주세요.");
       return;
@@ -143,7 +145,7 @@ function App() {
       totalBudgetKrw: draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000,
       categories: draft.categories,
       segment: draft.segment || null,
-      goal: draft.goal,
+      goalPosition: draft.goalPosition,
       desiredCreatorCount: draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount),
     };
     const nextResult = recommendCreators(creators, query);
@@ -198,7 +200,7 @@ function App() {
           <h1>캠페인에 맞는 크리에이터 찾기</h1>
           <p>예산과 성과를 함께 보는 데이터 기반 추천</p>
         </div>
-        <span>200 CREATORS · 10 CATEGORIES</span>
+        <span>크리에이터 200명 · 카테고리 10개</span>
       </header>
 
       <main id="main" className="workspace">
@@ -216,13 +218,15 @@ function App() {
             onBudgetChange={(budgetManwon) => {
               setDraft((current) => ({ ...current, budgetManwon }));
               clearError("budget");
+              clearError("countOrBudget");
             }}
             onDesiredCreatorCountChange={(desiredCreatorCount) => {
               setDraft((current) => ({ ...current, desiredCreatorCount }));
               clearError("desiredCreatorCount");
+              clearError("countOrBudget");
             }}
-            onGoalChange={(goal: CampaignGoal) => {
-              setDraft((current) => ({ ...current, goal }));
+            onGoalChange={(goalPosition) => {
+              setDraft((current) => ({ ...current, goalPosition }));
             }}
             onCategoryChange={(category: Category, checked) => {
               setDraft((current) => ({
@@ -243,7 +247,6 @@ function App() {
           {loadState === "loading" && (
             <div className="loading-state" role="status">
               <span className="loading-mark" aria-hidden="true" />
-              <p className="eyebrow">LOADING DATA</p>
               <h2>크리에이터 데이터를 확인하고 있어요.</h2>
               <p>잠시만 기다려 주세요.</p>
             </div>
@@ -251,7 +254,6 @@ function App() {
 
           {loadState === "error" && (
             <div className="data-error" role="alert">
-              <p className="eyebrow">DATA ERROR</p>
               <h2>추천 데이터를 불러오지 못했어요.</h2>
               <p>{loadError}</p>
               <button type="button" onClick={handleReload}>다시 불러오기</button>

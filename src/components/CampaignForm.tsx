@@ -1,23 +1,23 @@
 import type { FormEvent, RefObject } from "react";
 import {
   CATEGORIES,
-  type CampaignGoal,
   type Category,
   type FollowerSegment,
 } from "../domain/types";
-import { CAMPAIGN_GOALS, CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
+import { getCampaignGoalProfile } from "../recommendation/goals";
 
 export interface CampaignDraft {
   budgetManwon: string;
   categories: Category[];
   segment: FollowerSegment | "";
-  goal: CampaignGoal;
+  goalPosition: number;
   desiredCreatorCount: string;
 }
 
 export interface FormErrors {
   budget?: string;
   desiredCreatorCount?: string;
+  countOrBudget?: string;
 }
 
 interface CampaignFormProps {
@@ -29,12 +29,12 @@ interface CampaignFormProps {
   desiredCreatorCountRef: RefObject<HTMLInputElement | null>;
   categoryRef: RefObject<HTMLElement | null>;
   segmentRef: RefObject<HTMLSelectElement | null>;
-  goalRef: RefObject<HTMLSelectElement | null>;
+  goalRef: RefObject<HTMLInputElement | null>;
   onBudgetChange: (value: string) => void;
   onDesiredCreatorCountChange: (value: string) => void;
   onCategoryChange: (category: Category, checked: boolean) => void;
   onSegmentChange: (segment: FollowerSegment | "") => void;
-  onGoalChange: (goal: CampaignGoal) => void;
+  onGoalChange: (goalPosition: number) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -49,7 +49,7 @@ const segmentOptions: Array<{
 ];
 
 const formatBudget = (value: string) => {
-  if (value === "") return "비우면 예산 제한 없이 추천해요.";
+  if (value === "") return "비우려면 추천 인원을 입력해 주세요.";
   if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
   const totalManwon = new Intl.NumberFormat("ko-KR").format(Number(value));
   return `총 ${totalManwon}만원 안에서 가장 적합한 조합을 찾아요.`;
@@ -78,85 +78,107 @@ export function CampaignForm({
   onGoalChange,
   onSubmit,
 }: CampaignFormProps) {
+  const goalProfile = getCampaignGoalProfile(draft.goalPosition);
+  const countHasError = Boolean(errors.desiredCreatorCount || errors.countOrBudget);
+  const budgetHasError = Boolean(errors.budget || errors.countOrBudget);
+
   return (
     <form className="campaign-form" noValidate onSubmit={onSubmit}>
       <div className="form-heading">
-        <p className="eyebrow">CAMPAIGN BRIEF</p>
         <h2>추천 조건</h2>
-        <p>모든 필터는 선택 사항이에요. 비워두면 전체를 대상으로 추천합니다.</p>
+        <p>추천 인원 또는 총예산 중 하나를 입력하고, 나머지 조건은 필요할 때만 좁혀보세요.</p>
       </div>
 
       <div className="compact-filter-grid">
-        <div className="field-group field-span-full">
+        <div className="field-group">
           <label htmlFor="goal">캠페인 목적</label>
-          <select
-            ref={goalRef}
-            id="goal"
-            name="goal"
-            disabled={disabled}
-            value={draft.goal}
-            onChange={(event) => onGoalChange(event.target.value as CampaignGoal)}
-          >
-            {CAMPAIGN_GOALS.map((goal) => (
-              <option key={goal} value={goal}>{CAMPAIGN_GOAL_PROFILES[goal].label}</option>
-            ))}
-          </select>
-          <p className="field-help">{CAMPAIGN_GOAL_PROFILES[draft.goal].description}</p>
+          <div className="goal-slider-control">
+            <div className="goal-slider-value">
+              <strong>{goalProfile.label}</strong>
+              <output htmlFor="goal">조절값 {draft.goalPosition}</output>
+            </div>
+            <input
+              ref={goalRef}
+              id="goal"
+              name="goalPosition"
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              disabled={disabled}
+              value={draft.goalPosition}
+              aria-label="캠페인 목적"
+              aria-valuetext={`${goalProfile.label}. ${goalProfile.weightSummary}`}
+              onChange={(event) => onGoalChange(Number(event.target.value))}
+            />
+            <div className="goal-slider-scale" aria-hidden="true">
+              <span>노출</span>
+              <span>균형</span>
+              <span>참여</span>
+            </div>
+          </div>
+          <p className="field-help">{goalProfile.description}</p>
+          <p className="goal-slider-weights">{goalProfile.weightSummary}</p>
         </div>
 
-        <div className="field-group">
-          <label htmlFor="desired-creator-count">추천 인원 <span className="optional-label" aria-hidden="true">선택</span></label>
-          <div className="unit-input-wrap">
-            <input
-              ref={desiredCreatorCountRef}
-              id="desired-creator-count"
-              name="desiredCreatorCount"
-              aria-label="추천 인원"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              max="20"
-              step="1"
-              disabled={disabled}
-              value={draft.desiredCreatorCount}
-              aria-invalid={Boolean(errors.desiredCreatorCount)}
-              aria-describedby={`count-help${errors.desiredCreatorCount ? " count-error" : ""}`}
-              onChange={(event) => onDesiredCreatorCountChange(event.target.value)}
-              placeholder="제한 없음"
-            />
-            <span aria-hidden="true">명</span>
+        <div className="required-filter-row">
+          <div className="field-group">
+            <label htmlFor="desired-creator-count">추천 인원 <span className="optional-label">둘 중 하나 필수</span></label>
+            <div className="unit-input-wrap">
+              <input
+                ref={desiredCreatorCountRef}
+                id="desired-creator-count"
+                name="desiredCreatorCount"
+                aria-label="추천 인원"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="20"
+                step="1"
+                disabled={disabled}
+                value={draft.desiredCreatorCount}
+                aria-invalid={countHasError}
+                aria-describedby={`count-help${errors.desiredCreatorCount ? " count-error" : ""}${errors.countOrBudget ? " count-budget-error" : ""}`}
+                onChange={(event) => onDesiredCreatorCountChange(event.target.value)}
+                placeholder="제한 없음"
+              />
+              <span aria-hidden="true">명</span>
+            </div>
+            <p id="count-help" className="field-help">최대 20명</p>
+            {errors.desiredCreatorCount && (
+              <p id="count-error" className="field-error">{errors.desiredCreatorCount}</p>
+            )}
           </div>
-          <p id="count-help" className="field-help">비우면 인원수 제한 없이 추천해요. · 최대 20명</p>
-          {errors.desiredCreatorCount && (
-            <p id="count-error" className="field-error">{errors.desiredCreatorCount}</p>
+
+          <div className="field-group">
+            <label htmlFor="budget">총 예산 <span className="optional-label">둘 중 하나 필수</span></label>
+            <div className="unit-input-wrap">
+              <input
+                ref={budgetRef}
+                id="budget"
+                name="budgetManwon"
+                aria-label="총 예산"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="off"
+                disabled={disabled}
+                value={draft.budgetManwon}
+                aria-invalid={budgetHasError}
+                aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}${errors.countOrBudget ? " count-budget-error" : ""}`}
+                onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
+                placeholder="제한 없음"
+              />
+              <span aria-hidden="true">만원</span>
+            </div>
+            <p id="budget-help" className="field-help">
+              {formatBudget(draft.budgetManwon)}
+            </p>
+            {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
+          </div>
+          {errors.countOrBudget && (
+            <p id="count-budget-error" className="field-error required-pair-error">{errors.countOrBudget}</p>
           )}
-        </div>
-
-        <div className="field-group">
-          <label htmlFor="budget">총 예산 <span className="optional-label" aria-hidden="true">선택</span></label>
-          <div className="unit-input-wrap">
-            <input
-              ref={budgetRef}
-              id="budget"
-              name="budgetManwon"
-              aria-label="총 예산"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              autoComplete="off"
-              disabled={disabled}
-              value={draft.budgetManwon}
-              aria-invalid={Boolean(errors.budget)}
-              aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}`}
-              onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
-              placeholder="제한 없음"
-            />
-            <span aria-hidden="true">만원</span>
-          </div>
-          <p id="budget-help" className="field-help">
-            {formatBudget(draft.budgetManwon)}
-          </p>
-          {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
         </div>
 
         <div className="field-group">

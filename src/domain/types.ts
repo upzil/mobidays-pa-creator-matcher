@@ -14,11 +14,6 @@ export const CATEGORIES = [
 export type Category = (typeof CATEGORIES)[number];
 export type Platform = "유튜브" | "인스타그램";
 export type FollowerSegment = "nano" | "micro" | "macro";
-export type CampaignGoal =
-  | "awareness"
-  | "engagement"
-  | "conversion"
-  | "balanced";
 export type MatchTier =
   | "exact"
   | "exploration"
@@ -80,7 +75,7 @@ export interface RecommendationQuery {
   totalBudgetKrw: number | null;
   categories: readonly Category[];
   segment: FollowerSegment | null;
-  goal: CampaignGoal;
+  goalPosition: number;
   desiredCreatorCount: number | null;
 }
 

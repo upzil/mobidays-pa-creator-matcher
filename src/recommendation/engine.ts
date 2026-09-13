@@ -1,6 +1,5 @@
 import type {
   Creator,
-  CampaignGoal,
   FollowerSegment,
   MatchTier,
   RecommendedCreator,
@@ -12,7 +11,11 @@ import type {
   ScoreComponent,
   SortMode,
 } from "../domain/types";
-import { CAMPAIGN_GOAL_PROFILES, CAMPAIGN_GOALS } from "./goals";
+import {
+  CAMPAIGN_GOAL_MAX,
+  CAMPAIGN_GOAL_MIN,
+  getCampaignGoalProfile,
+} from "./goals";
 
 const RATING_PRIOR_STRENGTH = 5;
 const SEGMENT_LABELS: Record<FollowerSegment, string> = {
@@ -109,9 +112,9 @@ function makeBreakdown(
   creator: Creator,
   totalBudgetKrw: number | null,
   context: ScoreContext,
-  goal: CampaignGoal,
+  goalPosition: number,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
-  const weights = CAMPAIGN_GOAL_PROFILES[goal].weights;
+  const weights = getCampaignGoalProfile(goalPosition).weights;
   const engagementPercentile = averageRankPercentile(
     creator.engagementRate,
     context.segmentCreators.map((item) => item.engagementRate),
@@ -292,14 +295,14 @@ function scoreCreator(
   totalBudgetKrw: number | null,
   context: ScoreContext,
   requestedSegment: FollowerSegment | null,
-  goal: CampaignGoal,
+  goalPosition: number,
   hasCategoryFilter: boolean,
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
     totalBudgetKrw,
     context,
-    goal,
+    goalPosition,
   );
   const scoreRaw = Object.values(breakdown).reduce(
     (sum, scoreComponent) => sum + scoreComponent.contribution,
@@ -517,8 +520,12 @@ function assertQuery(query: RecommendationQuery): void {
   ) {
     throw new RangeError("지원하지 않는 팔로워 규모입니다.");
   }
-  if (!CAMPAIGN_GOALS.includes(query.goal)) {
-    throw new RangeError("지원하지 않는 캠페인 목적입니다.");
+  if (
+    !Number.isFinite(query.goalPosition) ||
+    query.goalPosition < CAMPAIGN_GOAL_MIN ||
+    query.goalPosition > CAMPAIGN_GOAL_MAX
+  ) {
+    throw new RangeError("goalPosition은 0 이상 100 이하의 숫자여야 합니다.");
   }
   if (
     query.desiredCreatorCount !== null &&
@@ -527,6 +534,9 @@ function assertQuery(query: RecommendationQuery): void {
       query.desiredCreatorCount > 20)
   ) {
     throw new RangeError("desiredCreatorCount는 null이거나 1 이상 20 이하의 안전한 정수여야 합니다.");
+  }
+  if (query.totalBudgetKrw === null && query.desiredCreatorCount === null) {
+    throw new RangeError("totalBudgetKrw와 desiredCreatorCount 중 하나는 필수입니다.");
   }
 }
 
@@ -539,7 +549,7 @@ export function recommendCreators(
     totalBudgetKrw: query.totalBudgetKrw,
     categories: [...query.categories],
     segment: query.segment,
-    goal: query.goal,
+    goalPosition: query.goalPosition,
     desiredCreatorCount: query.desiredCreatorCount,
   };
   const categories = new Set(query.categories);
@@ -571,7 +581,7 @@ export function recommendCreators(
       query.totalBudgetKrw,
       contextFor(creator.segment),
       query.segment,
-      query.goal,
+      query.goalPosition,
       query.categories.length > 0,
     );
   const makeSection = (

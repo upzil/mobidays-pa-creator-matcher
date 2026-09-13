@@ -8,7 +8,7 @@ import type {
 } from "../domain/types";
 import { CreatorDirectory } from "./CreatorDirectory";
 import { CreatorCard } from "./CreatorCard";
-import { CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
+import { getCampaignGoalProfile } from "../recommendation/goals";
 
 const segmentLabels: Record<FollowerSegment, string> = {
   nano: "나노",
@@ -90,7 +90,7 @@ export function ResultsPanel({
   const remainingCreators = creators.filter(
     (creator) => !recommendedIds.has(creator.creatorId),
   );
-  const goalProfile = CAMPAIGN_GOAL_PROFILES[result.appliedQuery.goal];
+  const goalProfile = getCampaignGoalProfile(result.appliedQuery.goalPosition);
   const selectedItems = sections.flatMap((section) => section.items);
   const hasUnknownCost = selectedItems.some(
     (item) => item.creator.avgCampaignBudgetKrw === null,
@@ -142,7 +142,6 @@ export function ResultsPanel({
             <section className="result-section" key={sectionId} aria-labelledby={`section-${sectionId}`}>
               <header className="section-heading">
                 <div>
-                  <p className="eyebrow">{section.tier.replace("-", " ").toUpperCase()}</p>
                   <h3 id={`section-${sectionId}`}>{sectionCopy[section.tier].title}{section.segment ? ` · ${segmentLabels[section.segment]}` : ""}</h3>
                 </div>
                 <span>{section.items.length}명</span>
@@ -162,7 +161,6 @@ export function ResultsPanel({
               excludedRows={0}
               sortMode={browseSortMode}
               onSortChange={onBrowseSortChange}
-              eyebrow="OTHER CREATORS"
               heading={`그 외 크리에이터 ${remainingCreators.length}명`}
               description="추천 후보를 상단에 배치했어요. 나머지 전체 목록도 기본 지표로 계속 비교할 수 있어요."
             />
@@ -171,7 +169,6 @@ export function ResultsPanel({
       ) : (
         <>
           <section className="empty-state" aria-labelledby="empty-title">
-            <p className="eyebrow">NO AVAILABLE MATCH</p>
             <h3 id="empty-title">카테고리를 유지한 대안도 찾지 못했어요.</h3>
             <p>{result.diagnostics[0] ?? "예산을 높이거나 크리에이터 규모 또는 카테고리를 바꿔 다시 찾아보세요."}</p>
             <div className="recovery-actions" aria-label="조건 수정 바로가기">
