@@ -8,7 +8,7 @@ import {
 import { CAMPAIGN_GOALS, CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
 
 export interface CampaignDraft {
-  budget: string;
+  budgetManwon: string;
   categories: Category[];
   segment: FollowerSegment | "";
   goal: CampaignGoal;
@@ -48,10 +48,16 @@ const segmentOptions: Array<{
   { value: "macro", label: "매크로", range: "10만 명 이상" },
 ];
 
-const formatBudget = (value: string) => {
+const formatBudget = (value: string, desiredCreatorCount: string) => {
   if (value === "") return "비우면 예산 제한 없이 추천해요.";
   if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
-  return `${new Intl.NumberFormat("ko-KR").format(Number(value))}원`;
+  const count = Number(desiredCreatorCount);
+  const totalManwon = new Intl.NumberFormat("ko-KR").format(Number(value));
+  if (!Number.isSafeInteger(count) || count < 1) return `총 ${totalManwon}만원`;
+  const perCreatorManwon = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(
+    Number(value) / count,
+  );
+  return `총 ${totalManwon}만원 · 1인당 약 ${perCreatorManwon}만원 기준`;
 };
 
 function categorySummary(categories: readonly Category[]): string {
@@ -130,27 +136,29 @@ export function CampaignForm({
         </div>
 
         <div className="field-group">
-          <label htmlFor="budget">1인당 최대 예산 <span className="optional-label" aria-hidden="true">선택</span></label>
+          <label htmlFor="budget">총 예산 <span className="optional-label" aria-hidden="true">선택</span></label>
           <div className="unit-input-wrap">
             <input
               ref={budgetRef}
               id="budget"
-              name="budget"
-              aria-label="1인당 최대 예산"
+              name="budgetManwon"
+              aria-label="총 예산"
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
               autoComplete="off"
               disabled={disabled}
-              value={draft.budget}
+              value={draft.budgetManwon}
               aria-invalid={Boolean(errors.budget)}
               aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}`}
               onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
               placeholder="제한 없음"
             />
-            <span aria-hidden="true">원</span>
+            <span aria-hidden="true">만원</span>
           </div>
-          <p id="budget-help" className="field-help">{formatBudget(draft.budget)}</p>
+          <p id="budget-help" className="field-help">
+            {formatBudget(draft.budgetManwon, draft.desiredCreatorCount)}
+          </p>
           {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
         </div>
 

@@ -33,13 +33,13 @@ function creator(
 }
 
 function query(
-  budgetKrw: number | null,
+  totalBudgetKrw: number | null,
   categories: Category[] = ["게임"],
   segment: FollowerSegment | null = "nano",
   goal: CampaignGoal = "balanced",
   desiredCreatorCount = 5,
 ) {
-  return { budgetKrw, categories, segment, goal, desiredCreatorCount } as const;
+  return { totalBudgetKrw, categories, segment, goal, desiredCreatorCount } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -71,7 +71,7 @@ describe("recommendCreators", () => {
     expect(result.outcome).toBe("exact");
     expect(result.sections.flatMap(({ items }) => items)).toHaveLength(5);
     expect(result.appliedQuery).toMatchObject({
-      budgetKrw: null,
+      totalBudgetKrw: null,
       categories: [],
       segment: null,
       desiredCreatorCount: 5,
@@ -90,12 +90,28 @@ describe("recommendCreators", () => {
           advertiserRating: null,
         }),
       ],
-      query(300_000, ["게임"], "nano", "balanced", 2),
+      query(600_000, ["게임"], "nano", "balanced", 2),
     );
 
     expect(result.sections).toHaveLength(1);
     expect(result.sections[0].tier).toBe("exact");
     expect(result.sections[0].items).toHaveLength(2);
+  });
+
+  it("총예산을 추천 인원으로 나눈 금액을 1인당 예산 기준으로 사용한다", () => {
+    const candidates = [creator("COST-300", { avgCampaignBudgetKrw: 300_000 })];
+
+    const twoCreators = recommendCreators(
+      candidates,
+      query(600_000, ["게임"], "nano", "balanced", 2),
+    );
+    const threeCreators = recommendCreators(
+      candidates,
+      query(600_000, ["게임"], "nano", "balanced", 3),
+    );
+
+    expect(twoCreators.outcome).toBe("exact");
+    expect(threeCreators.outcome).toBe("empty");
   });
 
   it("캠페인 목적에 따라 가중치와 추천 순위가 달라진다", () => {
@@ -114,11 +130,11 @@ describe("recommendCreators", () => {
 
     const awareness = recommendCreators(
       candidates,
-      query(300_000, ["게임"], "nano", "awareness"),
+      query(1_500_000, ["게임"], "nano", "awareness"),
     );
     const conversion = recommendCreators(
       candidates,
-      query(300_000, ["게임"], "nano", "conversion"),
+      query(1_500_000, ["게임"], "nano", "conversion"),
     );
 
     expect(awareness.sections[0].items[0].creator.creatorId).toBe("REACH");
@@ -139,7 +155,7 @@ describe("recommendCreators", () => {
       creator("C2", { category: "뷰티", avgCampaignBudgetKrw: 300_000 }),
       creator("C3", { category: "여행", avgCampaignBudgetKrw: 100_000 }),
     ];
-    const result = recommendCreators(creators, query(300_000, ["게임", "뷰티"]));
+    const result = recommendCreators(creators, query(1_500_000, ["게임", "뷰티"]));
 
     expect(result.outcome).toBe("exact");
     expect(result.sections[0].items.map(({ creator }) => creator.creatorId).sort()).toEqual([
@@ -159,7 +175,7 @@ describe("recommendCreators", () => {
           advertiserRating: null,
         }),
       ],
-      query(300_000),
+      query(1_500_000),
     );
 
     expect(result.sections.map(({ tier }) => tier)).toEqual(["exact", "exploration"]);
@@ -175,7 +191,7 @@ describe("recommendCreators", () => {
         creator("IN", { avgCampaignBudgetKrw: 120 }),
         creator("OUT", { avgCampaignBudgetKrw: 121 }),
       ],
-      query(100),
+      query(500),
     );
 
     expect(result.outcome).toBe("budget-relaxed");
@@ -189,7 +205,7 @@ describe("recommendCreators", () => {
         creator("MACRO", { followers: 100_000, segment: "macro", avgCampaignBudgetKrw: 500_000 }),
         creator("OTHER", { category: "여행", followers: 8_000, segment: "nano", avgCampaignBudgetKrw: 100_000 }),
       ],
-      query(500_000, ["게임"], "micro"),
+      query(2_500_000, ["게임"], "micro"),
     );
 
     expect(result.outcome).toBe("segment-relaxed");
@@ -201,7 +217,7 @@ describe("recommendCreators", () => {
   it("모든 fallback이 없으면 empty를 반환한다", () => {
     const result = recommendCreators(
       [creator("TRAVEL", { category: "여행" })],
-      query(1, ["게임"]),
+      query(5, ["게임"]),
     );
 
     expect(result.outcome).toBe("empty");
@@ -212,8 +228,8 @@ describe("recommendCreators", () => {
   it("입력 순서와 반복 실행에 무관하며 원본을 변경하지 않는다", () => {
     const creators = [creator("C2", { engagementRate: 8 }), creator("C1", { engagementRate: 8 })];
     const snapshot = structuredClone(creators);
-    const forward = recommendCreators(creators, query(300_000));
-    const reverse = recommendCreators([...creators].reverse(), query(300_000));
+    const forward = recommendCreators(creators, query(1_500_000));
+    const reverse = recommendCreators([...creators].reverse(), query(1_500_000));
 
     expect(forward.sections[0].items.map(({ creator }) => creator.creatorId)).toEqual([
       "C1",
@@ -231,21 +247,21 @@ describe("recommendCreators", () => {
       readFileSync("public/data/dummy_creators.csv", "utf8"),
     ).creators;
 
-    const exact = recommendCreators(creators, query(300_000));
+    const exact = recommendCreators(creators, query(1_500_000));
     expect(exact.sections[0].items.slice(0, 3).map((item) => [item.creator.creatorId, item.score])).toEqual([
       ["C0071", 78.9],
       ["C0080", 65.2],
       ["C0165", 46.2],
     ]);
 
-    const exploration = recommendCreators(creators, query(100_000, ["패션"]));
+    const exploration = recommendCreators(creators, query(500_000, ["패션"]));
     expect(exploration.outcome).toBe("exploration");
     expect(exploration.sections[0].items[0]).toMatchObject({
       creator: { creatorId: "C0011" },
       score: 45.7,
     });
 
-    const relaxed = recommendCreators(creators, query(600_000, ["게임"], "macro"));
+    const relaxed = recommendCreators(creators, query(3_000_000, ["게임"], "macro"));
     expect(relaxed.outcome).toBe("segment-relaxed");
     expect(relaxed.sections[0].items.slice(0, 2).map((item) => [item.creator.creatorId, item.score])).toEqual([
       ["C0002", 52.4],
@@ -266,7 +282,7 @@ describe("sortRecommendations", () => {
           advertiserRating: null,
         }),
       ],
-      query(300_000),
+      query(1_500_000),
     );
     const items = result.sections.flatMap(({ items }) => items);
     const original = [...items];

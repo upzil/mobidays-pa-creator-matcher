@@ -93,7 +93,7 @@ function buildScoreContext(
 
 function makeBreakdown(
   creator: Creator,
-  budgetKrw: number | null,
+  perCreatorBudgetKrw: number | null,
   context: ScoreContext,
   goal: CampaignGoal,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
@@ -126,9 +126,9 @@ function makeBreakdown(
       ? 0.5
       : (context.ratingPercentiles.get(creator.creatorId) ?? 0.5);
   const budgetEfficiency =
-    budgetKrw === null || creator.avgCampaignBudgetKrw === null
+    perCreatorBudgetKrw === null || creator.avgCampaignBudgetKrw === null
       ? 0.5
-      : budgetKrw / (budgetKrw + creator.avgCampaignBudgetKrw);
+      : perCreatorBudgetKrw / (perCreatorBudgetKrw + creator.avgCampaignBudgetKrw);
 
   return {
     adjustedRating,
@@ -245,7 +245,7 @@ function makeReasons(
     if (hasBudgetFilter) {
       reasons.push({
         code: "within-budget",
-        message: "평균 협업비가 입력 예산 안에 들어와요.",
+        message: "평균 협업비가 총예산의 1인당 환산 기준 안에 들어와요.",
       });
     }
   } else if (tier === "exploration") {
@@ -256,7 +256,7 @@ function makeReasons(
   } else if (tier === "budget-relaxed") {
     reasons.push({
       code: "budget-relaxed",
-      message: `입력 예산보다 ${(100 * (budgetOverageRate ?? 0)).toFixed(1)}% 높지만 20% 이내의 대안이에요.`,
+      message: `1인당 환산 예산보다 ${(100 * (budgetOverageRate ?? 0)).toFixed(1)}% 높지만 20% 이내의 대안이에요.`,
     });
   } else {
     reasons.push({
@@ -281,7 +281,7 @@ function makeReasons(
 function scoreCreator(
   creator: Creator,
   tier: MatchTier,
-  budgetKrw: number | null,
+  perCreatorBudgetKrw: number | null,
   context: ScoreContext,
   requestedSegment: FollowerSegment | null,
   goal: CampaignGoal,
@@ -289,7 +289,7 @@ function scoreCreator(
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
-    budgetKrw,
+    perCreatorBudgetKrw,
     context,
     goal,
   );
@@ -298,9 +298,9 @@ function scoreCreator(
     0,
   );
   const budgetOverageRate =
-    budgetKrw === null || creator.avgCampaignBudgetKrw === null
+    perCreatorBudgetKrw === null || creator.avgCampaignBudgetKrw === null
       ? null
-      : Math.max(0, creator.avgCampaignBudgetKrw / budgetKrw - 1);
+      : Math.max(0, creator.avgCampaignBudgetKrw / perCreatorBudgetKrw - 1);
   const warnings: string[] = [];
 
   if (creator.totalCampaignCount === 0) {
@@ -310,7 +310,7 @@ function scoreCreator(
   }
   if (tier === "budget-relaxed" && budgetOverageRate !== null) {
     warnings.push(
-      `평균 협업비가 입력 예산보다 ${(budgetOverageRate * 100).toFixed(1)}% 높아요.`,
+      `평균 협업비가 총예산의 1인당 환산 기준보다 ${(budgetOverageRate * 100).toFixed(1)}% 높아요.`,
     );
   }
   if (tier === "segment-relaxed" && requestedSegment !== null) {
@@ -332,7 +332,7 @@ function scoreCreator(
       breakdown,
       budgetOverageRate,
       hasCategoryFilter,
-      budgetKrw !== null,
+      perCreatorBudgetKrw !== null,
     ),
     warnings,
     budgetOverageRate,
@@ -394,10 +394,10 @@ function adjacentSegments(segment: FollowerSegment): FollowerSegment[] {
 
 function assertQuery(query: RecommendationQuery): void {
   if (
-    query.budgetKrw !== null &&
-    (!Number.isSafeInteger(query.budgetKrw) || query.budgetKrw <= 0)
+    query.totalBudgetKrw !== null &&
+    (!Number.isSafeInteger(query.totalBudgetKrw) || query.totalBudgetKrw <= 0)
   ) {
-    throw new RangeError("budgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
+    throw new RangeError("totalBudgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
   }
   if (
     query.segment !== null &&
@@ -423,7 +423,7 @@ export function recommendCreators(
 ): RecommendationResult {
   assertQuery(query);
   const appliedQuery: RecommendationQuery = {
-    budgetKrw: query.budgetKrw,
+    totalBudgetKrw: query.totalBudgetKrw,
     categories: [...query.categories],
     segment: query.segment,
     goal: query.goal,
@@ -444,6 +444,9 @@ export function recommendCreators(
       ? 3
       : knownRatings.reduce((sum, rating) => sum + rating, 0) / knownRatings.length;
   const contexts = new Map<FollowerSegment, ScoreContext>();
+  const perCreatorBudgetKrw = query.totalBudgetKrw === null
+    ? null
+    : query.totalBudgetKrw / query.desiredCreatorCount;
   const contextFor = (segment: FollowerSegment): ScoreContext => {
     const existing = contexts.get(segment);
     if (existing) return existing;
@@ -455,7 +458,7 @@ export function recommendCreators(
     scoreCreator(
       creator,
       tier,
-      query.budgetKrw,
+      perCreatorBudgetKrw,
       contextFor(creator.segment),
       query.segment,
       query.goal,
@@ -488,12 +491,12 @@ export function recommendCreators(
 
   const exact = sameSegment.filter(
     (creator) =>
-      query.budgetKrw === null ||
+      perCreatorBudgetKrw === null ||
       (creator.avgCampaignBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw <= query.budgetKrw),
+        creator.avgCampaignBudgetKrw <= perCreatorBudgetKrw),
   );
   const exploration = sameSegment.filter(
-    (creator) => query.budgetKrw !== null && creator.avgCampaignBudgetKrw === null,
+    (creator) => perCreatorBudgetKrw !== null && creator.avgCampaignBudgetKrw === null,
   );
 
   if (exact.length > 0) {
@@ -510,13 +513,12 @@ export function recommendCreators(
     };
   }
 
-  const budgetKrw = query.budgetKrw;
-  const budgetRelaxed = budgetKrw === null ? [] : sameSegment.filter((creator) => {
+  const budgetRelaxed = perCreatorBudgetKrw === null ? [] : sameSegment.filter((creator) => {
     const cost = creator.avgCampaignBudgetKrw;
     return (
       cost !== null &&
-      cost > budgetKrw &&
-      cost * 5 <= budgetKrw * 6
+      cost > perCreatorBudgetKrw &&
+      cost * 5 <= perCreatorBudgetKrw * 6
     );
   });
   if (budgetRelaxed.length > 0) {
@@ -528,7 +530,7 @@ export function recommendCreators(
       ]),
       attemptedRelaxations: ["budget-20-percent"],
       diagnostics: [
-        "정확히 일치하는 후보가 없어 같은 카테고리와 규모에서 예산을 최대 20%까지 완화했어요.",
+        "정확히 일치하는 후보가 없어 같은 카테고리와 규모에서 1인당 환산 예산을 최대 20%까지 완화했어요.",
       ],
     };
   }
@@ -538,9 +540,9 @@ export function recommendCreators(
     const candidates = relevant.filter(
       (creator) =>
         creator.segment === segment &&
-        budgetKrw !== null &&
+        perCreatorBudgetKrw !== null &&
         creator.avgCampaignBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw <= budgetKrw,
+        creator.avgCampaignBudgetKrw <= perCreatorBudgetKrw,
     );
     return candidates.length > 0
       ? [makeSection("segment-relaxed", candidates, segment)]
@@ -586,7 +588,7 @@ export function recommendCreators(
       "unknown-cost",
     ],
     diagnostics: [
-      "선택한 카테고리·규모·예산과 가까운 후보를 찾지 못했어요. 예산을 높이거나 규모 또는 카테고리를 변경해 주세요.",
+      "선택한 카테고리·규모·총예산과 가까운 후보를 찾지 못했어요. 총예산을 높이거나 규모 또는 카테고리를 변경해 주세요.",
     ],
   };
 }

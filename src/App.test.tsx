@@ -72,7 +72,7 @@ describe("App", () => {
       "게임채널",
       "새로운채널",
     ]);
-    expect(screen.getByLabelText("1인당 최대 예산")).toBeEnabled();
+    expect(screen.getByLabelText("총 예산")).toBeEnabled();
     expect(screen.getByLabelText("추천 인원")).toHaveValue(5);
     expect(screen.getByLabelText("캠페인 목적")).toHaveValue("balanced");
     expect(screen.getByLabelText(/크리에이터 규모/)).toHaveValue("");
@@ -100,9 +100,11 @@ describe("App", () => {
 
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByRole("heading", { name: "3명의 후보를 찾았어요" })).toBeInTheDocument();
-    expect(screen.getByText("제한 없음")).toBeInTheDocument();
-    expect(screen.getAllByText("전체")).toHaveLength(2);
+    expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
+    expect(screen.getByText("게임채널")).toBeInTheDocument();
+    expect(screen.getByText("새로운채널")).toBeInTheDocument();
+    expect(screen.getByText("교육채널")).toBeInTheDocument();
+    expect(screen.queryByText("APPLIED CONDITIONS")).not.toBeInTheDocument();
     expect(screen.queryByText(/선택해 주세요/)).not.toBeInTheDocument();
   });
 
@@ -111,7 +113,8 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
-    await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
+    await user.type(screen.getByLabelText("총 예산"), "150");
+    expect(screen.getByText("총 150만원 · 1인당 약 30만원 기준")).toBeInTheDocument();
     await user.click(screen.getByText("전체 카테고리"));
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
     await user.selectOptions(screen.getByLabelText(/크리에이터 규모/), "nano");
@@ -124,10 +127,10 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "그 외 크리에이터 1명" })).toBeInTheDocument();
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
-    expect(screen.getAllByText("균형 탐색")).toHaveLength(2);
+    expect(screen.getByText("균형 탐색")).toBeInTheDocument();
     expect(screen.getByText(/참여율 30% · 조회수 25%/)).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText("1인당 최대 예산"), "0");
+    await user.type(screen.getByLabelText("총 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
     expect(screen.getByText("게임채널")).toBeInTheDocument();
   });
@@ -138,7 +141,7 @@ describe("App", () => {
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.selectOptions(screen.getByLabelText("캠페인 목적"), "awareness");
-    await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
+    await user.type(screen.getByLabelText("총 예산"), "150");
     await user.click(screen.getByText("전체 카테고리"));
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
     await user.selectOptions(screen.getByLabelText(/크리에이터 규모/), "nano");
@@ -162,7 +165,7 @@ describe("App", () => {
     await user.type(screen.getByLabelText("추천 인원"), "1");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByRole("heading", { name: "1명의 후보를 찾았어요" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "그 외 크리에이터 2명" })).toBeInTheDocument();
   });
 

@@ -10,12 +10,6 @@ import { CreatorDirectory } from "./CreatorDirectory";
 import { CreatorCard } from "./CreatorCard";
 import { CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
 
-const currencyFormatter = new Intl.NumberFormat("ko-KR", {
-  style: "currency",
-  currency: "KRW",
-  maximumFractionDigits: 0,
-});
-
 const segmentLabels: Record<FollowerSegment, string> = {
   nano: "나노",
   micro: "마이크로",
@@ -41,11 +35,11 @@ const sectionCopy: Record<RecommendationSection["tier"], { title: string; descri
   },
   "budget-relaxed": {
     title: "예산을 조금 넓힌 대안",
-    description: "정확한 후보가 없어, 입력 예산보다 최대 20% 높은 같은 카테고리·규모 후보를 찾았어요.",
+    description: "정확한 후보가 없어, 총예산의 1인당 환산 기준보다 최대 20% 높은 후보를 찾았어요.",
   },
   "segment-relaxed": {
     title: "규모를 넓힌 대안",
-    description: "예산 안에서 찾기 위해 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
+    description: "1인당 환산 예산 안에서 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
   },
 };
 
@@ -98,21 +92,6 @@ export function ResultsPanel({
 
   return (
     <div className="results-content">
-      <div className="applied-summary">
-        <div>
-          <p className="eyebrow">APPLIED CONDITIONS</p>
-          <h2>{itemCount > 0 ? `${itemCount}명의 후보를 찾았어요` : "조건에 맞는 후보가 없어요"}</h2>
-        </div>
-        <dl>
-          <div><dt>추천 인원</dt><dd>{result.appliedQuery.desiredCreatorCount}명</dd></div>
-          <div><dt>예산</dt><dd>{result.appliedQuery.budgetKrw === null ? "제한 없음" : currencyFormatter.format(result.appliedQuery.budgetKrw)}</dd></div>
-          <div><dt>목적</dt><dd>{goalProfile.label}</dd></div>
-          <div><dt>카테고리</dt><dd>{result.appliedQuery.categories.length === 0 ? "전체" : result.appliedQuery.categories.join(", ")}</dd></div>
-          <div><dt>규모</dt><dd>{result.appliedQuery.segment === null ? "전체" : segmentLabels[result.appliedQuery.segment]}</dd></div>
-        </dl>
-        <button type="button" className="text-button" onClick={onFocusBudget}>조건 수정</button>
-      </div>
-
       {excludedRows > 0 && (
         <p className="data-warning" role="status">
           유효하지 않은 데이터 {excludedRows}건을 제외하고 계산했어요.

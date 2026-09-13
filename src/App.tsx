@@ -17,7 +17,7 @@ import { recommendCreators, sortRecommendations } from "./recommendation/engine"
 import "./styles.css";
 
 const initialDraft: CampaignDraft = {
-  budget: "",
+  budgetManwon: "",
   categories: [],
   segment: "",
   goal: "balanced",
@@ -26,8 +26,14 @@ const initialDraft: CampaignDraft = {
 
 function validateDraft(draft: CampaignDraft): FormErrors {
   const errors: FormErrors = {};
-  if (draft.budget !== "" && (!/^\d+$/.test(draft.budget) || Number(draft.budget) <= 0)) {
-    errors.budget = "1원 이상의 1인당 최대 예산을 입력해 주세요.";
+  const totalBudgetKrw = Number(draft.budgetManwon) * 10_000;
+  if (
+    draft.budgetManwon !== "" &&
+    (!/^\d+$/.test(draft.budgetManwon) ||
+      Number(draft.budgetManwon) <= 0 ||
+      !Number.isSafeInteger(totalBudgetKrw))
+  ) {
+    errors.budget = "1만원 이상의 총 예산을 입력해 주세요.";
   }
   if (
     !/^\d+$/.test(draft.desiredCreatorCount) ||
@@ -42,7 +48,7 @@ function validateDraft(draft: CampaignDraft): FormErrors {
 function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | null) {
   if (!query) return false;
   return (
-    (draft.budget === "" ? null : Number(draft.budget)) === query.budgetKrw &&
+    (draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000) === query.totalBudgetKrw &&
     (draft.segment || null) === query.segment &&
     draft.goal === query.goal &&
     Number(draft.desiredCreatorCount) === query.desiredCreatorCount &&
@@ -133,7 +139,7 @@ function App() {
     if (loadState !== "ready") return;
 
     const query: RecommendationQuery = {
-      budgetKrw: draft.budget === "" ? null : Number(draft.budget),
+      totalBudgetKrw: draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000,
       categories: draft.categories,
       segment: draft.segment || null,
       goal: draft.goal,
@@ -206,8 +212,8 @@ function App() {
             goalRef={goalRef}
             categoryRef={categoryRef}
             segmentRef={segmentRef}
-            onBudgetChange={(budget) => {
-              setDraft((current) => ({ ...current, budget }));
+            onBudgetChange={(budgetManwon) => {
+              setDraft((current) => ({ ...current, budgetManwon }));
               clearError("budget");
             }}
             onDesiredCreatorCountChange={(desiredCreatorCount) => {

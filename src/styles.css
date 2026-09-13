@@ -148,7 +148,6 @@ a:focus-visible {
 .form-heading h2,
 .initial-state h2,
 .directory-heading h2,
-.applied-summary h2,
 .loading-state h2,
 .data-error h2 {
   margin: 0;
@@ -217,7 +216,7 @@ a:focus-visible {
 }
 
 .unit-input-wrap input {
-  padding: 0 36px 0 12px;
+  padding: 0 50px 0 12px;
 }
 
 .unit-input-wrap input[aria-invalid="true"] {
@@ -535,52 +534,13 @@ a:focus-visible {
   animation: spin 700ms linear infinite;
 }
 
-.applied-summary {
-  padding-bottom: 30px;
-  border-bottom: 1px solid var(--ink);
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) auto;
-  gap: 24px 40px;
-  align-items: end;
-}
-
-.applied-summary dl {
-  margin: 0;
-  display: flex;
-  gap: 26px;
-  flex-wrap: wrap;
-}
-
-.applied-summary dl > div {
-  min-width: 90px;
-}
-
-.applied-summary dt,
 .metric dt {
   color: var(--muted);
   font-size: 0.72rem;
 }
 
-.applied-summary dd {
-  margin: 5px 0 0;
-  font-size: 0.9rem;
-  font-weight: 750;
-}
-
-.text-button {
-  grid-column: 2;
-  justify-self: end;
-  min-height: 44px;
-  padding: 0;
-  border: 0;
-  border-bottom: 1px solid currentColor;
-  background: transparent;
-  color: var(--accent-dark);
-  font-weight: 750;
-}
-
 .results-toolbar {
-  margin: 24px 0 46px;
+  margin: 0 0 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -903,7 +863,6 @@ a:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .applied-summary,
   .results-toolbar,
   .directory-heading {
     display: block;
@@ -942,16 +901,6 @@ a:focus-visible {
     margin-bottom: 4px;
     color: var(--muted);
     font-size: 0.66rem;
-  }
-
-  .applied-summary dl {
-    margin-top: 22px;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .text-button {
-    margin-top: 18px;
   }
 
   .results-toolbar label {

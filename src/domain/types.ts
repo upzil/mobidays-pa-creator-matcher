@@ -78,7 +78,7 @@ export interface ParsedCreators {
 }
 
 export interface RecommendationQuery {
-  budgetKrw: number | null;
+  totalBudgetKrw: number | null;
   categories: readonly Category[];
   segment: FollowerSegment | null;
   goal: CampaignGoal;
