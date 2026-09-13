@@ -32,8 +32,8 @@ const creators: Creator[] = [
     platform: "인스타그램",
     followers: 7_000,
     segment: "nano",
-    avgViewCount: 1_500,
-    engagementRate: 7.1,
+    avgViewCount: 5_000,
+    engagementRate: 9.1,
     totalCampaignCount: 0,
     totalCampaignBudgetKrw: 0,
     avgCampaignBudgetKrw: null,
@@ -47,20 +47,38 @@ describe("App", () => {
     vi.mocked(loadCreators).mockResolvedValue({ creators, diagnostics: [] });
   });
 
-  it("데이터를 불러온 뒤 초기 안내와 세 입력을 제공한다", async () => {
+  it("데이터를 불러온 뒤 전체 크리에이터와 기본 정렬을 제공한다", async () => {
     render(<App />);
 
     expect(screen.getByRole("status")).toHaveTextContent("데이터를 확인");
-    expect(await screen.findByText(/조건을 입력하면/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터 2명" })).toBeInTheDocument();
+    expect(screen.getByLabelText("전체 목록 정렬")).toHaveValue("followers");
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      "게임채널",
+      "새로운채널",
+    ]);
     expect(screen.getByLabelText("1인당 최대 예산")).toBeEnabled();
     expect(screen.getByRole("group", { name: "카테고리" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "크리에이터 규모" })).toBeInTheDocument();
   });
 
+  it("추천 전 전체 목록을 기본 지표로 재정렬한다", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
+
+    await user.selectOptions(screen.getByLabelText("전체 목록 정렬"), "views");
+
+    expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      "새로운채널",
+      "게임채널",
+    ]);
+  });
+
   it("빈 제출 시 필드 오류를 표시하고 첫 오류로 초점을 옮긴다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText(/조건을 입력하면/);
+    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
 
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
@@ -73,7 +91,7 @@ describe("App", () => {
   it("유효 조건으로 정확 추천과 별도 탐색 후보를 표시한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText(/조건을 입력하면/);
+    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
 
     await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
@@ -102,6 +120,6 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "다시 불러오기" }));
 
     await waitFor(() => expect(loadCreators).toHaveBeenCalledTimes(2));
-    expect(await screen.findByText(/조건을 입력하면/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터 2명" })).toBeInTheDocument();
   });
 });

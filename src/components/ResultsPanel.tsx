@@ -1,9 +1,12 @@
 import type {
+  BrowseSortMode,
+  Creator,
   FollowerSegment,
   RecommendationResult,
   RecommendationSection,
   SortMode,
 } from "../domain/types";
+import { CreatorDirectory } from "./CreatorDirectory";
 import { CreatorCard } from "./CreatorCard";
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR", {
@@ -46,42 +49,42 @@ const sectionCopy: Record<RecommendationSection["tier"], { title: string; descri
 };
 
 interface ResultsPanelProps {
+  creators: Creator[];
   result: RecommendationResult | null;
   sections: RecommendationSection[];
   excludedRows: number;
+  browseSortMode: BrowseSortMode;
   sortMode: SortMode;
+  onBrowseSortChange: (mode: BrowseSortMode) => void;
   onSortChange: (mode: SortMode) => void;
   onFocusBudget: () => void;
   onFocusCategories: () => void;
   onFocusSegment: () => void;
 }
 
-function InitialState() {
-  return (
-    <div className="initial-state">
-      <span className="initial-index">01 — 03</span>
-      <h2>조건을 입력하면<br />검토할 순서까지 정리해 드려요.</h2>
-      <p>팔로워 수만 비교하지 않고 참여율, 조회수, 협업 경험과 광고주 평가를 함께 봅니다.</p>
-      <ol>
-        <li><span>01</span> 예산과 캠페인 분야 선택</li>
-        <li><span>02</span> 원하는 크리에이터 규모 선택</li>
-        <li><span>03</span> 근거와 함께 추천 결과 확인</li>
-      </ol>
-    </div>
-  );
-}
-
 export function ResultsPanel({
+  creators,
   result,
   sections,
   excludedRows,
+  browseSortMode,
   sortMode,
+  onBrowseSortChange,
   onSortChange,
   onFocusBudget,
   onFocusCategories,
   onFocusSegment,
 }: ResultsPanelProps) {
-  if (!result) return <InitialState />;
+  if (!result) {
+    return (
+      <CreatorDirectory
+        creators={creators}
+        excludedRows={excludedRows}
+        sortMode={browseSortMode}
+        onSortChange={onBrowseSortChange}
+      />
+    );
+  }
 
   const itemCount = sections.reduce((count, section) => count + section.items.length, 0);
 

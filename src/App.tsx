@@ -3,6 +3,7 @@ import { CampaignForm, type CampaignDraft, type FormErrors } from "./components/
 import { ResultsPanel } from "./components/ResultsPanel";
 import { loadCreators } from "./data/creatorCsv";
 import type {
+  BrowseSortMode,
   Category,
   Creator,
   FollowerSegment,
@@ -10,6 +11,7 @@ import type {
   RecommendationResult,
   SortMode,
 } from "./domain/types";
+import { sortCreatorsForBrowse } from "./recommendation/browse";
 import { recommendCreators, sortRecommendations } from "./recommendation/engine";
 import "./styles.css";
 
@@ -51,6 +53,7 @@ function App() {
   const [loadError, setLoadError] = useState("");
   const [excludedRows, setExcludedRows] = useState(0);
   const [result, setResult] = useState<RecommendationResult | null>(null);
+  const [browseSortMode, setBrowseSortMode] = useState<BrowseSortMode>("followers");
   const [sortMode, setSortMode] = useState<SortMode>("recommended");
   const [announcement, setAnnouncement] = useState("크리에이터 데이터를 불러오는 중입니다.");
   const [reloadToken, setReloadToken] = useState(0);
@@ -90,6 +93,11 @@ function App() {
       items: sortRecommendations(section.items, sortMode),
     }));
   }, [result, sortMode]);
+
+  const sortedCreators = useMemo(
+    () => sortCreatorsForBrowse(creators, browseSortMode),
+    [creators, browseSortMode],
+  );
 
   const isDirty = result !== null && !draftMatchesQuery(draft, result.appliedQuery);
 
@@ -144,6 +152,18 @@ function App() {
       budget: "협업비 낮은 순",
     }[mode];
     setAnnouncement(`${label}으로 결과를 정렬했습니다.`);
+  };
+
+  const handleBrowseSortChange = (mode: BrowseSortMode) => {
+    setBrowseSortMode(mode);
+    const label = {
+      followers: "팔로워 많은 순",
+      views: "평균 조회수 많은 순",
+      engagement: "참여율 높은 순",
+      rating: "광고주 평점 높은 순",
+      budget: "협업비 낮은 순",
+    }[mode];
+    setAnnouncement(`${label}으로 전체 크리에이터를 정렬했습니다.`);
   };
 
   const handleReload = () => {
@@ -217,10 +237,13 @@ function App() {
 
           {loadState === "ready" && (
             <ResultsPanel
+              creators={sortedCreators}
               result={result}
               sections={sortedSections}
               excludedRows={excludedRows}
+              browseSortMode={browseSortMode}
               sortMode={sortMode}
+              onBrowseSortChange={handleBrowseSortChange}
               onSortChange={handleSortChange}
               onFocusBudget={() => budgetRef.current?.focus()}
               onFocusCategories={() => categoryRef.current?.focus()}

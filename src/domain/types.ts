@@ -25,6 +25,12 @@ export type SortMode =
   | "views"
   | "rating"
   | "budget";
+export type BrowseSortMode =
+  | "followers"
+  | "views"
+  | "engagement"
+  | "rating"
+  | "budget";
 
 export interface RawCreatorRow {
   creator_id: string;
