@@ -58,6 +58,7 @@ select:disabled {
 }
 
 .choice-control:has(input:disabled),
+.goal-control:has(input:disabled),
 .segment-control:has(input:disabled) {
   cursor: wait;
   opacity: 0.58;
@@ -237,6 +238,7 @@ a:focus-visible {
 }
 
 .choice-control,
+.goal-control,
 .segment-control {
   min-height: 44px;
   position: relative;
@@ -246,6 +248,7 @@ a:focus-visible {
 }
 
 .choice-control input,
+.goal-control input,
 .segment-control input {
   position: absolute;
   inset: 0;
@@ -272,15 +275,40 @@ a:focus-visible {
 }
 
 .choice-control input:focus-visible + span,
+.goal-control input:focus-visible + span,
 .segment-control input:focus-visible + span {
   outline: 3px solid #8279ff;
   outline-offset: 2px;
 }
 
+.goal-list,
 .segment-list {
   display: grid;
   gap: 7px;
   margin-top: 13px;
+}
+
+.goal-copy {
+  width: 100%;
+  min-height: 62px;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 3px;
+  background: white;
+  transition: 160ms ease;
+}
+
+.goal-copy small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.goal-control input:checked + .goal-copy {
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 var(--accent);
+  color: var(--accent-dark);
 }
 
 .segment-copy {
@@ -537,6 +565,7 @@ a:focus-visible {
   margin: 0;
   display: flex;
   gap: 26px;
+  flex-wrap: wrap;
 }
 
 .applied-summary dl > div {
@@ -579,6 +608,20 @@ a:focus-visible {
   margin: 0;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.goal-weight-note {
+  display: grid;
+  gap: 5px;
+}
+
+.goal-weight-note strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.goal-weight-note span {
+  font-variant-numeric: tabular-nums;
 }
 
 .results-toolbar label {

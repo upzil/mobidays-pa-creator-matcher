@@ -73,6 +73,7 @@ describe("App", () => {
       "새로운채널",
     ]);
     expect(screen.getByLabelText("1인당 최대 예산")).toBeEnabled();
+    expect(screen.getByRole("group", { name: "캠페인 목적" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "카테고리" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "크리에이터 규모" })).toBeInTheDocument();
   });
@@ -99,9 +100,10 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(screen.getByText(/1원 이상의/)).toBeInTheDocument();
+    expect(screen.getByText(/캠페인 목적을 선택/)).toBeInTheDocument();
     expect(screen.getByText(/카테고리를 하나 이상/)).toBeInTheDocument();
     expect(screen.getByText(/규모를 선택/)).toBeInTheDocument();
-    expect(screen.getByLabelText("1인당 최대 예산")).toHaveFocus();
+    expect(screen.getByRole("radio", { name: /노출 확대/ })).toHaveFocus();
   });
 
   it("유효 조건으로 정확 추천과 별도 탐색 후보를 표시한다", async () => {
@@ -110,6 +112,7 @@ describe("App", () => {
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
+    await user.click(screen.getByRole("radio", { name: /균형 탐색/ }));
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
     await user.click(screen.getByRole("radio", { name: /나노/ }));
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
@@ -121,10 +124,32 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "그 외 크리에이터 1명" })).toBeInTheDocument();
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
+    expect(screen.getAllByText("균형 탐색")).toHaveLength(2);
+    expect(screen.getByText(/참여율 30% · 조회수 25%/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("1인당 최대 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
     expect(screen.getByText("게임채널")).toBeInTheDocument();
+  });
+
+  it("목적을 바꿔 다시 추천하면 목적별 가중치를 적용한다", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+
+    await user.click(screen.getByRole("radio", { name: /노출 확대/ }));
+    await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
+    await user.click(screen.getByRole("checkbox", { name: "게임" }));
+    await user.click(screen.getByRole("radio", { name: /나노/ }));
+    await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
+
+    expect(await screen.findByText(/조회수 45% · 참여율 20%/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /전환 중심/ }));
+    await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
+
+    expect(await screen.findByText(/평점 30% · 참여율 25%/)).toBeInTheDocument();
+    expect(screen.getByText(/직접 전환 데이터가 없어/)).toBeInTheDocument();
   });
 
   it("CSV 로드 오류에서 다시 불러올 수 있다", async () => {

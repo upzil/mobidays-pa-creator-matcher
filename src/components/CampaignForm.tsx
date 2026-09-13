@@ -1,20 +1,24 @@
 import type { FormEvent, RefObject } from "react";
 import {
   CATEGORIES,
+  type CampaignGoal,
   type Category,
   type FollowerSegment,
 } from "../domain/types";
+import { CAMPAIGN_GOALS, CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
 
 export interface CampaignDraft {
   budget: string;
   categories: Category[];
   segment: FollowerSegment | "";
+  goal: CampaignGoal | "";
 }
 
 export interface FormErrors {
   budget?: string;
   categories?: string;
   segment?: string;
+  goal?: string;
 }
 
 interface CampaignFormProps {
@@ -25,9 +29,11 @@ interface CampaignFormProps {
   budgetRef: RefObject<HTMLInputElement | null>;
   categoryRef: RefObject<HTMLInputElement | null>;
   segmentRef: RefObject<HTMLInputElement | null>;
+  goalRef: RefObject<HTMLInputElement | null>;
   onBudgetChange: (value: string) => void;
   onCategoryChange: (category: Category, checked: boolean) => void;
   onSegmentChange: (segment: FollowerSegment) => void;
+  onGoalChange: (goal: CampaignGoal) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
@@ -54,9 +60,11 @@ export function CampaignForm({
   budgetRef,
   categoryRef,
   segmentRef,
+  goalRef,
   onBudgetChange,
   onCategoryChange,
   onSegmentChange,
+  onGoalChange,
   onSubmit,
 }: CampaignFormProps) {
   return (
@@ -66,6 +74,35 @@ export function CampaignForm({
         <h2>추천 조건</h2>
         <p>한 명과 협업할 때의 기준으로 입력해 주세요.</p>
       </div>
+
+      <fieldset className="field-group" aria-describedby={errors.goal ? "goal-error" : "goal-help"}>
+        <legend>캠페인 목적</legend>
+        <p id="goal-help" className="field-help">목적에 따라 추천 점수의 지표별 비중이 달라져요.</p>
+        <div className="goal-list">
+          {CAMPAIGN_GOALS.map((goal, index) => {
+            const profile = CAMPAIGN_GOAL_PROFILES[goal];
+            return (
+              <label className="goal-control" key={goal}>
+                <input
+                  ref={index === 0 ? goalRef : undefined}
+                  type="radio"
+                  name="goal"
+                  value={goal}
+                  disabled={disabled}
+                  checked={draft.goal === goal}
+                  aria-invalid={Boolean(errors.goal)}
+                  onChange={() => onGoalChange(goal)}
+                />
+                <span className="goal-copy">
+                  <strong>{profile.label}</strong>
+                  <small>{profile.description}</small>
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        {errors.goal && <p id="goal-error" className="field-error">{errors.goal}</p>}
+      </fieldset>
 
       <div className="field-group">
         <label htmlFor="budget">1인당 최대 예산</label>

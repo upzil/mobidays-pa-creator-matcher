@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { parseCreatorsCsv } from "../data/creatorCsv";
-import type { Category, Creator, FollowerSegment } from "../domain/types";
+import type { CampaignGoal, Category, Creator, FollowerSegment } from "../domain/types";
+import { CAMPAIGN_GOAL_PROFILES } from "./goals";
 import {
   getFollowerSegment,
   recommendCreators,
@@ -35,8 +36,9 @@ function query(
   budgetKrw: number,
   categories: Category[] = ["게임"],
   segment: FollowerSegment = "nano",
+  goal: CampaignGoal = "balanced",
 ) {
-  return { budgetKrw, categories, segment } as const;
+  return { budgetKrw, categories, segment, goal } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -51,6 +53,41 @@ describe("getFollowerSegment", () => {
 });
 
 describe("recommendCreators", () => {
+  it("캠페인 목적에 따라 가중치와 추천 순위가 달라진다", () => {
+    const candidates = [
+      creator("REACH", {
+        avgViewCount: 10_000,
+        engagementRate: 2,
+        advertiserRating: 3.5,
+      }),
+      creator("CONVERT", {
+        avgViewCount: 1_000,
+        engagementRate: 10,
+        advertiserRating: 5,
+      }),
+    ];
+
+    const awareness = recommendCreators(
+      candidates,
+      query(300_000, ["게임"], "nano", "awareness"),
+    );
+    const conversion = recommendCreators(
+      candidates,
+      query(300_000, ["게임"], "nano", "conversion"),
+    );
+
+    expect(awareness.sections[0].items[0].creator.creatorId).toBe("REACH");
+    expect(conversion.sections[0].items[0].creator.creatorId).toBe("CONVERT");
+    expect(awareness.sections[0].items[0].breakdown.views.weight).toBe(0.45);
+    expect(conversion.sections[0].items[0].breakdown.rating.weight).toBe(0.3);
+  });
+
+  it("모든 캠페인 목적의 가중치 합이 100%다", () => {
+    for (const profile of Object.values(CAMPAIGN_GOAL_PROFILES)) {
+      expect(Object.values(profile.weights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1);
+    }
+  });
+
   it("예산 equality와 복수 카테고리 OR를 정확 일치로 처리한다", () => {
     const creators = [
       creator("C1", { avgCampaignBudgetKrw: 300_000 }),

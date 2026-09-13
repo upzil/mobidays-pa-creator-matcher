@@ -8,6 +8,7 @@ import type {
 } from "../domain/types";
 import { CreatorDirectory } from "./CreatorDirectory";
 import { CreatorCard } from "./CreatorCard";
+import { CAMPAIGN_GOAL_PROFILES } from "../recommendation/goals";
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR", {
   style: "currency",
@@ -93,6 +94,7 @@ export function ResultsPanel({
   const remainingCreators = creators.filter(
     (creator) => !recommendedIds.has(creator.creatorId),
   );
+  const goalProfile = CAMPAIGN_GOAL_PROFILES[result.appliedQuery.goal];
 
   return (
     <div className="results-content">
@@ -103,6 +105,7 @@ export function ResultsPanel({
         </div>
         <dl>
           <div><dt>예산</dt><dd>{currencyFormatter.format(result.appliedQuery.budgetKrw)}</dd></div>
+          <div><dt>목적</dt><dd>{goalProfile.label}</dd></div>
           <div><dt>카테고리</dt><dd>{result.appliedQuery.categories.join(", ")}</dd></div>
           <div><dt>규모</dt><dd>{segmentLabels[result.appliedQuery.segment]}</dd></div>
         </dl>
@@ -118,7 +121,10 @@ export function ResultsPanel({
       {itemCount > 0 ? (
         <>
           <div className="results-toolbar">
-            <p>점수는 같은 팔로워 규모 안에서 성과를 비교한 값이에요.</p>
+            <p className="goal-weight-note">
+              <strong>{goalProfile.scoringNote}</strong>
+              <span>{goalProfile.weightSummary}</span>
+            </p>
             <label htmlFor="sort-results">
               <span>결과 정렬</span>
               <select

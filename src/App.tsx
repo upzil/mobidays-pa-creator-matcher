@@ -4,6 +4,7 @@ import { ResultsPanel } from "./components/ResultsPanel";
 import { loadCreators } from "./data/creatorCsv";
 import type {
   BrowseSortMode,
+  CampaignGoal,
   Category,
   Creator,
   FollowerSegment,
@@ -19,10 +20,14 @@ const initialDraft: CampaignDraft = {
   budget: "",
   categories: [],
   segment: "",
+  goal: "",
 };
 
 function validateDraft(draft: CampaignDraft): FormErrors {
   const errors: FormErrors = {};
+  if (!draft.goal) {
+    errors.goal = "캠페인 목적을 선택해 주세요.";
+  }
   if (!/^\d+$/.test(draft.budget) || Number(draft.budget) <= 0) {
     errors.budget = "1원 이상의 1인당 최대 예산을 입력해 주세요.";
   }
@@ -40,6 +45,7 @@ function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | nu
   return (
     Number(draft.budget) === query.budgetKrw &&
     draft.segment === query.segment &&
+    draft.goal === query.goal &&
     draft.categories.length === query.categories.length &&
     draft.categories.every((category) => query.categories.includes(category))
   );
@@ -58,6 +64,7 @@ function App() {
   const [announcement, setAnnouncement] = useState("크리에이터 데이터를 불러오는 중입니다.");
   const [reloadToken, setReloadToken] = useState(0);
   const budgetRef = useRef<HTMLInputElement>(null);
+  const goalRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLInputElement>(null);
   const segmentRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
@@ -116,19 +123,21 @@ function App() {
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      if (nextErrors.budget) budgetRef.current?.focus();
+      if (nextErrors.goal) goalRef.current?.focus();
+      else if (nextErrors.budget) budgetRef.current?.focus();
       else if (nextErrors.categories) categoryRef.current?.focus();
       else segmentRef.current?.focus();
       setAnnouncement("입력한 조건을 확인해 주세요.");
       return;
     }
 
-    if (loadState !== "ready" || !draft.segment) return;
+    if (loadState !== "ready" || !draft.segment || !draft.goal) return;
 
     const query: RecommendationQuery = {
       budgetKrw: Number(draft.budget),
       categories: draft.categories,
       segment: draft.segment,
+      goal: draft.goal,
     };
     const nextResult = recommendCreators(creators, query);
     setResult(nextResult);
@@ -193,11 +202,16 @@ function App() {
             isDirty={isDirty}
             disabled={loadState !== "ready"}
             budgetRef={budgetRef}
+            goalRef={goalRef}
             categoryRef={categoryRef}
             segmentRef={segmentRef}
             onBudgetChange={(budget) => {
               setDraft((current) => ({ ...current, budget }));
               clearError("budget");
+            }}
+            onGoalChange={(goal: CampaignGoal) => {
+              setDraft((current) => ({ ...current, goal }));
+              clearError("goal");
             }}
             onCategoryChange={(category: Category, checked) => {
               setDraft((current) => ({

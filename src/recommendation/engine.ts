@@ -1,5 +1,6 @@
 import type {
   Creator,
+  CampaignGoal,
   FollowerSegment,
   MatchTier,
   RecommendedCreator,
@@ -11,14 +12,7 @@ import type {
   ScoreComponent,
   SortMode,
 } from "../domain/types";
-
-const WEIGHTS = {
-  engagement: 0.3,
-  views: 0.25,
-  rating: 0.2,
-  experience: 0.15,
-  budgetEfficiency: 0.1,
-} as const;
+import { CAMPAIGN_GOAL_PROFILES, CAMPAIGN_GOALS } from "./goals";
 
 const RATING_PRIOR_STRENGTH = 5;
 const SEGMENT_LABELS: Record<FollowerSegment, string> = {
@@ -101,7 +95,9 @@ function makeBreakdown(
   creator: Creator,
   budgetKrw: number,
   context: ScoreContext,
+  goal: CampaignGoal,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
+  const weights = CAMPAIGN_GOAL_PROFILES[goal].weights;
   const engagementPercentile = averageRankPercentile(
     creator.engagementRate,
     context.segmentCreators.map((item) => item.engagementRate),
@@ -140,19 +136,19 @@ function makeBreakdown(
       engagement: component(
         creator.engagementRate,
         engagementPercentile,
-        WEIGHTS.engagement,
+        weights.engagement,
         "observed",
       ),
       views: component(
         creator.avgViewCount,
         viewPercentile,
-        WEIGHTS.views,
+        weights.views,
         "observed",
       ),
       rating: component(
         creator.advertiserRating,
         ratingPercentile,
-        WEIGHTS.rating,
+        weights.rating,
         creator.advertiserRating === null
           ? "missing-neutral"
           : "bayesian-adjusted",
@@ -160,13 +156,13 @@ function makeBreakdown(
       experience: component(
         creator.totalCampaignCount,
         experience,
-        WEIGHTS.experience,
+        weights.experience,
         "observed",
       ),
       budgetEfficiency: component(
         creator.avgCampaignBudgetKrw,
         budgetEfficiency,
-        WEIGHTS.budgetEfficiency,
+        weights.budgetEfficiency,
         creator.avgCampaignBudgetKrw === null
           ? "missing-neutral"
           : "observed",
@@ -184,13 +180,13 @@ function performanceReason(
   breakdown: ScoreBreakdown,
 ): RecommendationReason | null {
   const candidates: Array<{
-    normalized: number;
+    contribution: number;
     reason: RecommendationReason;
   }> = [];
 
   if (breakdown.engagement.normalizedValue >= 0.75) {
     candidates.push({
-      normalized: breakdown.engagement.normalizedValue,
+      contribution: breakdown.engagement.contribution,
       reason: {
         code: "high-engagement",
         message: `참여율이 동일 규모 상위 ${topPercentLabel(breakdown.engagement.normalizedValue)}%예요.`,
@@ -199,7 +195,7 @@ function performanceReason(
   }
   if (breakdown.views.normalizedValue >= 0.75) {
     candidates.push({
-      normalized: breakdown.views.normalizedValue,
+      contribution: breakdown.views.contribution,
       reason: {
         code: "high-views",
         message: `평균 조회수가 동일 규모 상위 ${topPercentLabel(breakdown.views.normalizedValue)}%예요.`,
@@ -208,7 +204,7 @@ function performanceReason(
   }
   if (creator.advertiserRating !== null && creator.advertiserRating >= 4.5) {
     candidates.push({
-      normalized: breakdown.rating.normalizedValue,
+      contribution: breakdown.rating.contribution,
       reason: {
         code: "strong-rating",
         message: `광고주 평점이 ${creator.advertiserRating.toFixed(1)}점으로 높아요.`,
@@ -217,7 +213,7 @@ function performanceReason(
   }
   if (breakdown.experience.normalizedValue >= 0.75) {
     candidates.push({
-      normalized: breakdown.experience.normalizedValue,
+      contribution: breakdown.experience.contribution,
       reason: {
         code: "campaign-experience",
         message: `캠페인 ${creator.totalCampaignCount.toLocaleString("ko-KR")}건의 협업 이력이 있어요.`,
@@ -225,7 +221,7 @@ function performanceReason(
     });
   }
 
-  return candidates.sort((a, b) => b.normalized - a.normalized)[0]?.reason ?? null;
+  return candidates.sort((a, b) => b.contribution - a.contribution)[0]?.reason ?? null;
 }
 
 function makeReasons(
@@ -276,11 +272,13 @@ function scoreCreator(
   budgetKrw: number,
   context: ScoreContext,
   requestedSegment: FollowerSegment,
+  goal: CampaignGoal,
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
     budgetKrw,
     context,
+    goal,
   );
   const scoreRaw = Object.values(breakdown).reduce(
     (sum, scoreComponent) => sum + scoreComponent.contribution,
@@ -389,6 +387,9 @@ function assertQuery(query: RecommendationQuery): void {
   if (!["nano", "micro", "macro"].includes(query.segment)) {
     throw new RangeError("지원하지 않는 팔로워 규모입니다.");
   }
+  if (!CAMPAIGN_GOALS.includes(query.goal)) {
+    throw new RangeError("지원하지 않는 캠페인 목적입니다.");
+  }
 }
 
 export function recommendCreators(
@@ -400,6 +401,7 @@ export function recommendCreators(
     budgetKrw: query.budgetKrw,
     categories: [...query.categories],
     segment: query.segment,
+    goal: query.goal,
   };
   const categories = new Set(query.categories);
   const relevant = creators.filter((creator) => categories.has(creator.category));
@@ -426,6 +428,7 @@ export function recommendCreators(
       query.budgetKrw,
       contextFor(creator.segment),
       query.segment,
+      query.goal,
     );
   const makeSection = (
     tier: MatchTier,
