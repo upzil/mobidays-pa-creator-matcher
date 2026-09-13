@@ -81,6 +81,7 @@ describe("App", () => {
     const targetRow = screen.getByLabelText("추천 인원").closest(".target-filter-row");
     expect(targetRow).toContainElement(screen.getByLabelText("크리에이터 규모"));
     expect(screen.getByRole("radio", { name: "총 예산 방식" })).toBeChecked();
+    expect(screen.getByText("추천 인원 또는 예산 중 하나를 입력해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("전체 카테고리")).toBeInTheDocument();
     expect(screen.queryByText("둘 중 하나 필수")).not.toBeInTheDocument();
     expect(screen.queryByText("선택")).not.toBeInTheDocument();
@@ -108,6 +109,7 @@ describe("App", () => {
     await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     await user.type(screen.getByLabelText("추천 인원"), "3");
+    expect(screen.getByText("입력하지 않으면 예산 제한 없이 추천해요.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
@@ -270,6 +272,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(screen.getByText("추천 인원 또는 예산 중 하나를 입력해 주세요.")).toBeInTheDocument();
+    expect(screen.getAllByText("추천 인원 또는 예산 중 하나를 입력해 주세요.")).toHaveLength(1);
     expect(countInput).toHaveFocus();
     expect(screen.queryByRole("heading", { name: "조건에 맞는 추천" })).not.toBeInTheDocument();
   });

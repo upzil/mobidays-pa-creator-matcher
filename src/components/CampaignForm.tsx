@@ -56,8 +56,12 @@ const segmentOptions: Array<{
   { value: "macro", label: "매크로", range: "10만 명 이상" },
 ];
 
-const formatBudget = (value: string, mode: BudgetMode) => {
-  if (value === "") return "비우려면 추천 인원을 입력해 주세요.";
+const formatBudget = (value: string, mode: BudgetMode, desiredCreatorCount: string) => {
+  if (value === "") {
+    return desiredCreatorCount === ""
+      ? "추천 인원 또는 예산 중 하나를 입력해 주세요."
+      : "입력하지 않으면 예산 제한 없이 추천해요.";
+  }
   if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
   const manwon = new Intl.NumberFormat("ko-KR").format(Number(value));
   return mode === "total"
@@ -94,6 +98,12 @@ export function CampaignForm({
   const goalProfile = getCampaignGoalProfile(draft.goalPosition);
   const countHasError = Boolean(errors.desiredCreatorCount || errors.countOrBudget);
   const budgetHasError = Boolean(errors.budget || errors.countOrBudget);
+  const budgetHelpId = errors.countOrBudget ? "" : "budget-help";
+  const budgetDescribedBy = [
+    budgetHelpId,
+    errors.budget ? "budget-error" : "",
+    errors.countOrBudget ? "count-budget-error" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <form className="campaign-form" noValidate onSubmit={onSubmit}>
@@ -229,16 +239,18 @@ export function CampaignForm({
                 disabled={disabled}
                 value={draft.budgetManwon}
                 aria-invalid={budgetHasError}
-                aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}${errors.countOrBudget ? " count-budget-error" : ""}`}
+                aria-describedby={budgetDescribedBy}
                 onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
                 placeholder="제한 없음"
               />
               <span aria-hidden="true">만원</span>
             </div>
           </div>
-          <p id="budget-help" className="field-help">
-            {formatBudget(draft.budgetManwon, draft.budgetMode)}
-          </p>
+          {!errors.countOrBudget && (
+            <p id="budget-help" className="field-help">
+              {formatBudget(draft.budgetManwon, draft.budgetMode, draft.desiredCreatorCount)}
+            </p>
+          )}
           {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
         </fieldset>
 
