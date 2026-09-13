@@ -35,7 +35,7 @@ export function CreatorDirectory({
   excludedRows,
   sortMode,
   onSortChange,
-  heading = `전체 크리에이터 ${creators.length}명`,
+  heading = "전체 크리에이터",
   description = "추천 조건을 입력하기 전에도 주요 지표를 비교할 수 있어요.",
 }: CreatorDirectoryProps) {
   return (
@@ -45,18 +45,21 @@ export function CreatorDirectory({
           <h2>{heading}</h2>
           <p>{description}</p>
         </div>
-        <label htmlFor="sort-directory">
-          <span>전체 목록 정렬</span>
-          <select
-            id="sort-directory"
-            value={sortMode}
-            onChange={(event) => onSortChange(event.target.value as BrowseSortMode)}
-          >
-            {browseSortOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
+        <div className="directory-heading-actions">
+          <span>{creators.length}명</span>
+          <label htmlFor="sort-directory">
+            <span>전체 목록 정렬</span>
+            <select
+              id="sort-directory"
+              value={sortMode}
+              onChange={(event) => onSortChange(event.target.value as BrowseSortMode)}
+            >
+              {browseSortOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </header>
 
       {excludedRows > 0 && (

@@ -123,7 +123,7 @@ export function CampaignForm({
 
         <div className="required-filter-row">
           <div className="field-group">
-            <label htmlFor="desired-creator-count">추천 인원 <span className="optional-label">둘 중 하나 필수</span></label>
+            <label htmlFor="desired-creator-count">추천 인원</label>
             <div className="unit-input-wrap">
               <input
                 ref={desiredCreatorCountRef}
@@ -151,7 +151,7 @@ export function CampaignForm({
           </div>
 
           <div className="field-group">
-            <label htmlFor="budget">총 예산 <span className="optional-label">둘 중 하나 필수</span></label>
+            <label htmlFor="budget">총 예산</label>
             <div className="unit-input-wrap">
               <input
                 ref={budgetRef}
@@ -182,7 +182,7 @@ export function CampaignForm({
         </div>
 
         <div className="field-group">
-          <label htmlFor="segment">크리에이터 규모 <span className="optional-label" aria-hidden="true">선택</span></label>
+          <label htmlFor="segment">크리에이터 규모</label>
           <select
             ref={segmentRef}
             id="segment"
@@ -202,7 +202,7 @@ export function CampaignForm({
         </div>
 
         <div className="field-group">
-          <span className="field-label">카테고리 <span className="optional-label" aria-hidden="true">선택</span></span>
+          <span className="field-label">카테고리</span>
           <details className="category-select">
             <summary ref={categoryRef}>{categorySummary(draft.categories)}</summary>
             <fieldset aria-label="카테고리">
@@ -225,15 +225,17 @@ export function CampaignForm({
         </div>
       </div>
 
-      {isDirty && (
-        <p className="draft-notice" role="status">
-          조건이 변경됐어요. 추천받기 버튼을 눌러 결과를 갱신해 주세요.
-        </p>
-      )}
+      <div className="form-footer">
+        {isDirty && (
+          <p className="draft-notice" role="status">
+            조건이 변경됐어요. 추천받기 버튼을 눌러 결과를 갱신해 주세요.
+          </p>
+        )}
 
-      <button className="primary-button" type="submit" disabled={disabled}>
-        크리에이터 추천받기
-      </button>
+        <button className="primary-button" type="submit" disabled={disabled}>
+          크리에이터 추천받기
+        </button>
+      </div>
     </form>
   );
 }

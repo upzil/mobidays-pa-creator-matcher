@@ -1,20 +1,12 @@
 import type {
   BrowseSortMode,
   Creator,
-  FollowerSegment,
   RecommendationResult,
   RecommendationSection,
   SortMode,
 } from "../domain/types";
 import { CreatorDirectory } from "./CreatorDirectory";
 import { CreatorCard } from "./CreatorCard";
-import { getCampaignGoalProfile } from "../recommendation/goals";
-
-const segmentLabels: Record<FollowerSegment, string> = {
-  nano: "나노",
-  micro: "마이크로",
-  macro: "매크로",
-};
 
 const sortOptions: Array<{ value: SortMode; label: string }> = [
   { value: "recommended", label: "추천순" },
@@ -23,12 +15,6 @@ const sortOptions: Array<{ value: SortMode; label: string }> = [
   { value: "rating", label: "광고주 평점순" },
   { value: "budget", label: "협업비 낮은 순" },
 ];
-
-const currencyFormatter = new Intl.NumberFormat("ko-KR", {
-  style: "currency",
-  currency: "KRW",
-  maximumFractionDigits: 0,
-});
 
 const sectionCopy: Record<RecommendationSection["tier"], { title: string; description: string }> = {
   exact: {
@@ -90,20 +76,6 @@ export function ResultsPanel({
   const remainingCreators = creators.filter(
     (creator) => !recommendedIds.has(creator.creatorId),
   );
-  const goalProfile = getCampaignGoalProfile(result.appliedQuery.goalPosition);
-  const selectedItems = sections.flatMap((section) => section.items);
-  const hasUnknownCost = selectedItems.some(
-    (item) => item.creator.avgCampaignBudgetKrw === null,
-  );
-  const selectedCostKrw = selectedItems.reduce(
-    (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
-    0,
-  );
-  const combinationBudgetNote =
-    result.appliedQuery.totalBudgetKrw !== null && !hasUnknownCost
-      ? `조합 예상 비용 ${currencyFormatter.format(selectedCostKrw)} · 잔여 ${currencyFormatter.format(result.appliedQuery.totalBudgetKrw - selectedCostKrw)}`
-      : null;
-
   return (
     <div className="results-content">
       {excludedRows > 0 && (
@@ -114,37 +86,32 @@ export function ResultsPanel({
 
       {itemCount > 0 ? (
         <>
-          <div className="results-toolbar">
-            <p className="goal-weight-note">
-              <strong>{goalProfile.scoringNote}</strong>
-              <span>{goalProfile.weightSummary}</span>
-              {combinationBudgetNote && (
-                <span className="combination-budget-note">{combinationBudgetNote}</span>
-              )}
-            </p>
-            <label htmlFor="sort-results">
-              <span>결과 정렬</span>
-              <select
-                id="sort-results"
-                value={sortMode}
-                onChange={(event) => onSortChange(event.target.value as SortMode)}
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {sections.map((section) => {
+          {sections.map((section, sectionIndex) => {
             const sectionId = `${section.tier}-${section.segment ?? "all"}`;
             return (
             <section className="result-section" key={sectionId} aria-labelledby={`section-${sectionId}`}>
               <header className="section-heading">
                 <div>
-                  <h3 id={`section-${sectionId}`}>{sectionCopy[section.tier].title}{section.segment ? ` · ${segmentLabels[section.segment]}` : ""}</h3>
+                  <h3 id={`section-${sectionId}`}>{sectionCopy[section.tier].title}</h3>
                 </div>
-                <span>{section.items.length}명</span>
+                <div className="section-heading-actions">
+                  <span>{section.items.length}명</span>
+                  {sectionIndex === 0 && (
+                    <label htmlFor="sort-results">
+                      <span className="sr-only">결과 정렬</span>
+                      <select
+                        id="sort-results"
+                        aria-label="결과 정렬"
+                        value={sortMode}
+                        onChange={(event) => onSortChange(event.target.value as SortMode)}
+                      >
+                        {sortOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
               </header>
               <p className="section-description">{sectionCopy[section.tier].description}</p>
               <div className="creator-grid">
@@ -161,7 +128,7 @@ export function ResultsPanel({
               excludedRows={0}
               sortMode={browseSortMode}
               onSortChange={onBrowseSortChange}
-              heading={`그 외 크리에이터 ${remainingCreators.length}명`}
+              heading="그 외 크리에이터"
               description="추천 후보를 상단에 배치했어요. 나머지 전체 목록도 기본 지표로 계속 비교할 수 있어요."
             />
           )}

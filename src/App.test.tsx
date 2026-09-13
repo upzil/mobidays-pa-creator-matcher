@@ -65,7 +65,8 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByText("크리에이터 데이터를 확인하고 있어요.")).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "전체 크리에이터 3명" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터" })).toBeInTheDocument();
+    expect(screen.getByText("3명")).toBeInTheDocument();
     expect(screen.getByLabelText("전체 목록 정렬")).toHaveValue("followers");
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
       "교육채널",
@@ -77,6 +78,8 @@ describe("App", () => {
     expect(screen.getByLabelText("캠페인 목적")).toHaveValue("50");
     expect(screen.getByLabelText(/크리에이터 규모/)).toHaveValue("");
     expect(screen.getByText("전체 카테고리")).toBeInTheDocument();
+    expect(screen.queryByText("둘 중 하나 필수")).not.toBeInTheDocument();
+    expect(screen.queryByText("선택")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("추천 결과")).queryByText("나노")).not.toBeInTheDocument();
     expect(screen.queryByText("ALL CREATORS")).not.toBeInTheDocument();
   });
@@ -84,7 +87,7 @@ describe("App", () => {
   it("추천 전 전체 목록을 기본 지표로 재정렬한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     await user.selectOptions(screen.getByLabelText("전체 목록 정렬"), "views");
 
@@ -98,7 +101,7 @@ describe("App", () => {
   it("추천 인원을 입력하면 예산 없이 해당 인원까지 추천한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     await user.type(screen.getByLabelText("추천 인원"), "3");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
@@ -114,7 +117,7 @@ describe("App", () => {
   it("유효 조건으로 총예산 안의 비용 확인 가능 후보만 추천한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     await user.type(screen.getByLabelText("총 예산"), "150");
     expect(screen.getByText("총 150만원 안에서 가장 적합한 조합을 찾아요.")).toBeInTheDocument();
@@ -126,13 +129,19 @@ describe("App", () => {
     expect(await screen.findByText("게임채널")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새로운채널", level: 3 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /조건에 맞는 추천/ })).toBeInTheDocument();
-    expect(screen.getByText("조합 예상 비용 ₩300,000 · 잔여 ₩1,200,000")).toBeInTheDocument();
+    expect(screen.queryByText(/조합 예상 비용/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/특정 지표에 치우치지 않도록/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /함께 살펴볼 탐색 후보/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "그 외 크리에이터 2명" })).toBeInTheDocument();
+    const recommendationHeading = screen.getByRole("heading", { name: "조건에 맞는 추천" });
+    expect(recommendationHeading).not.toHaveTextContent("나노");
+    expect(within(recommendationHeading.closest(".section-heading") as HTMLElement).getByText("1명")).toBeInTheDocument();
+    expect(within(recommendationHeading.closest(".section-heading") as HTMLElement).getByLabelText("결과 정렬")).toBeInTheDocument();
+    const remainingHeading = screen.getByRole("heading", { name: "그 외 크리에이터" });
+    expect(within(remainingHeading.closest(".directory-heading") as HTMLElement).getByText("2명")).toBeInTheDocument();
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
     expect(screen.getByText("균형 탐색")).toBeInTheDocument();
-    expect(screen.getAllByText(/참여율 30% · 조회수 25%/)).toHaveLength(2);
+    expect(screen.getAllByText(/참여율 30% · 조회수 25%/)).toHaveLength(1);
 
     await user.type(screen.getByLabelText("총 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
@@ -142,7 +151,7 @@ describe("App", () => {
   it("목적을 바꿔 다시 추천하면 목적별 가중치를 적용한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "0" } });
     await user.type(screen.getByLabelText("총 예산"), "150");
@@ -151,32 +160,33 @@ describe("App", () => {
     await user.selectOptions(screen.getByLabelText(/크리에이터 규모/), "nano");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByText(/노출 쪽으로 조절한 수준/)).toBeInTheDocument();
-    expect(screen.getAllByText(/조회수 45% · 참여율 20%/)).toHaveLength(2);
+    expect(await screen.findByText("노출 중심")).toBeInTheDocument();
+    expect(screen.getAllByText(/조회수 45% · 참여율 20%/)).toHaveLength(1);
 
     fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "100" } });
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
-    expect(await screen.findByText(/참여 쪽으로 조절한 수준/)).toBeInTheDocument();
-    expect(screen.getAllByText(/참여율 45% · 조회수 20%/)).toHaveLength(2);
+    expect(await screen.findByText("참여 중심")).toBeInTheDocument();
+    expect(screen.getAllByText(/참여율 45% · 조회수 20%/)).toHaveLength(1);
   });
 
   it("추천 인원으로 노출 후보 수를 제한한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     await user.type(screen.getByLabelText("추천 인원"), "1");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "그 외 크리에이터 2명" })).toBeInTheDocument();
+    const remainingHeading = screen.getByRole("heading", { name: "그 외 크리에이터" });
+    expect(within(remainingHeading.closest(".directory-heading") as HTMLElement).getByText("2명")).toBeInTheDocument();
   });
 
   it("추천 인원이 허용 범위를 벗어나면 안내하고 입력으로 초점을 옮긴다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     const countInput = screen.getByLabelText("추천 인원");
     await user.type(countInput, "0");
@@ -190,7 +200,7 @@ describe("App", () => {
   it("추천 인원과 총예산을 모두 비우면 안내하고 추천 인원으로 초점을 옮긴다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
 
     const countInput = screen.getByLabelText("추천 인원");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
@@ -211,6 +221,6 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "다시 불러오기" }));
 
     await waitFor(() => expect(loadCreators).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("heading", { name: "전체 크리에이터 3명" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터" })).toBeInTheDocument();
   });
 });
