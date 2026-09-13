@@ -175,3 +175,11 @@
 - 판단: 채택. 앱 의존성 설치 승인과 무관하게 원본 데이터 검증을 재현할 수 있음
 - 검증: `node scripts/profile-data.mjs` 실행으로 200행·11열, 10개 카테고리, 플랫폼·구간 분포, 결측 27건, 중복 0건을 확인. 저장소 CSV와 원본의 SHA-256 일치 확인
 - 영향: `scripts/profile-data.mjs`, `public/data/dummy_creators.csv`
+
+### AI-20260913-05 — Git 줄바꿈 정규화 수정
+
+- 단계: Phase 2 저장소 무결성 검증
+- 발견: 작업 파일의 SHA-256은 원본과 같았지만 첫 커밋 직후 Git blob을 다시 해시하자 `core.autocrlf=input` 때문에 CRLF가 LF로 정규화되어 값이 달랐음
+- 판단: `public/data/dummy_creators.csv`를 `-text`로 지정해 줄바꿈 변환을 금지
+- 검증: 현재 커밋의 CSV blob과 다운로드 원본을 각각 SHA-256으로 계산해 동일한지 재확인
+- 영향: `.gitattributes`, `public/data/dummy_creators.csv`
