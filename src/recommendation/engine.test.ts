@@ -37,7 +37,7 @@ function query(
   categories: Category[] = ["게임"],
   segment: FollowerSegment | null = "nano",
   goal: CampaignGoal = "balanced",
-  desiredCreatorCount = 5,
+  desiredCreatorCount: number | null = null,
 ) {
   return { totalBudgetKrw, categories, segment, goal, desiredCreatorCount } as const;
 }
@@ -54,7 +54,7 @@ describe("getFollowerSegment", () => {
 });
 
 describe("recommendCreators", () => {
-  it("필터를 모두 비우면 전체 후보에서 기본 인원만 추천한다", () => {
+  it("추천 인원을 비우면 조건에 맞는 전체 후보를 추천한다", () => {
     const candidates = Array.from({ length: 8 }, (_, index) =>
       creator(`C${index + 1}`, {
         category: index % 2 === 0 ? "게임" : "교육",
@@ -65,16 +65,16 @@ describe("recommendCreators", () => {
 
     const result = recommendCreators(
       candidates,
-      query(null, [], null, "balanced", 5),
+      query(null, [], null),
     );
 
     expect(result.outcome).toBe("exact");
-    expect(result.sections.flatMap(({ items }) => items)).toHaveLength(5);
+    expect(result.sections.flatMap(({ items }) => items)).toHaveLength(8);
     expect(result.appliedQuery).toMatchObject({
       totalBudgetKrw: null,
       categories: [],
       segment: null,
-      desiredCreatorCount: 5,
+      desiredCreatorCount: null,
     });
   });
 
@@ -98,20 +98,52 @@ describe("recommendCreators", () => {
     expect(result.sections[0].items).toHaveLength(2);
   });
 
-  it("총예산을 추천 인원으로 나눈 금액을 1인당 예산 기준으로 사용한다", () => {
-    const candidates = [creator("COST-300", { avgCampaignBudgetKrw: 300_000 })];
+  it("총예산 안에서 요청 인원을 충족하는 최고 점수 조합을 선택한다", () => {
+    const candidates = [
+      creator("PREMIUM", {
+        avgCampaignBudgetKrw: 600_000,
+        avgViewCount: 20_000,
+        engagementRate: 12,
+        advertiserRating: 5,
+      }),
+      creator("VALUE-1", { avgCampaignBudgetKrw: 300_000, engagementRate: 9 }),
+      creator("VALUE-2", { avgCampaignBudgetKrw: 300_000, avgViewCount: 4_000 }),
+    ];
 
-    const twoCreators = recommendCreators(
+    const result = recommendCreators(
       candidates,
       query(600_000, ["게임"], "nano", "balanced", 2),
     );
-    const threeCreators = recommendCreators(
-      candidates,
-      query(600_000, ["게임"], "nano", "balanced", 3),
-    );
+    const selected = result.sections.flatMap(({ items }) => items);
 
-    expect(twoCreators.outcome).toBe("exact");
-    expect(threeCreators.outcome).toBe("empty");
+    expect(result.outcome).toBe("exact");
+    expect(selected.map(({ creator }) => creator.creatorId).sort()).toEqual([
+      "VALUE-1",
+      "VALUE-2",
+    ]);
+    expect(selected.reduce(
+      (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
+      0,
+    )).toBeLessThanOrEqual(600_000);
+  });
+
+  it("추천 인원이 없으면 총예산 안에서 총점 합이 가장 높은 조합을 선택한다", () => {
+    const candidates = [
+      creator("EXPENSIVE", {
+        avgCampaignBudgetKrw: 600_000,
+        avgViewCount: 20_000,
+        engagementRate: 12,
+      }),
+      creator("VALUE-1", { avgCampaignBudgetKrw: 300_000, engagementRate: 9 }),
+      creator("VALUE-2", { avgCampaignBudgetKrw: 300_000, avgViewCount: 4_000 }),
+    ];
+
+    const result = recommendCreators(candidates, query(600_000));
+
+    expect(result.sections[0].items.map(({ creator }) => creator.creatorId).sort()).toEqual([
+      "VALUE-1",
+      "VALUE-2",
+    ]);
   });
 
   it("캠페인 목적에 따라 가중치와 추천 순위가 달라진다", () => {
@@ -164,7 +196,7 @@ describe("recommendCreators", () => {
     ]);
   });
 
-  it("정확 후보와 비용 미상 후보를 서로 다른 섹션으로 반환한다", () => {
+  it("예산 조합에는 비용 미상 후보를 섞지 않는다", () => {
     const result = recommendCreators(
       [
         creator("KNOWN"),
@@ -178,27 +210,25 @@ describe("recommendCreators", () => {
       query(1_500_000),
     );
 
-    expect(result.sections.map(({ tier }) => tier)).toEqual(["exact", "exploration"]);
-    const exploration = result.sections[1].items[0];
-    expect(exploration.breakdown.rating.normalizedValue).toBe(0.5);
-    expect(exploration.breakdown.budgetEfficiency.normalizedValue).toBe(0.5);
-    expect(exploration.warnings.join(" ")).toContain("직접 확인");
+    expect(result.sections.map(({ tier }) => tier)).toEqual(["exact"]);
+    expect(result.sections[0].items[0].creator.creatorId).toBe("KNOWN");
   });
 
-  it("예산 120% 경계를 포함하고 1원 초과 후보는 제외한다", () => {
-    const result = recommendCreators(
-      [
-        creator("IN", { avgCampaignBudgetKrw: 120 }),
-        creator("OUT", { avgCampaignBudgetKrw: 121 }),
-      ],
-      query(500),
+  it("총예산을 초과하는 후보는 별도 완화 없이 제외한다", () => {
+    const exact = recommendCreators(
+      [creator("IN", { avgCampaignBudgetKrw: 120 })],
+      query(120, ["게임"], "nano", "balanced", 1),
+    );
+    const over = recommendCreators(
+      [creator("OUT", { avgCampaignBudgetKrw: 121 })],
+      query(120, ["게임"], "nano", "balanced", 1),
     );
 
-    expect(result.outcome).toBe("budget-relaxed");
-    expect(result.sections[0].items.map(({ creator }) => creator.creatorId)).toEqual(["IN"]);
+    expect(exact.outcome).toBe("exact");
+    expect(over.outcome).toBe("empty");
   });
 
-  it("예산 완화가 없으면 인접 규모를 사용하고 카테고리를 유지한다", () => {
+  it("정확 조합이 없으면 인접 규모를 사용하고 카테고리를 유지한다", () => {
     const result = recommendCreators(
       [
         creator("NANO", { followers: 8_000, segment: "nano", avgCampaignBudgetKrw: 500_000 }),
@@ -222,7 +252,7 @@ describe("recommendCreators", () => {
 
     expect(result.outcome).toBe("empty");
     expect(result.sections).toEqual([]);
-    expect(result.attemptedRelaxations).toHaveLength(3);
+    expect(result.attemptedRelaxations).toHaveLength(2);
   });
 
   it("입력 순서와 반복 실행에 무관하며 원본을 변경하지 않는다", () => {
@@ -248,13 +278,14 @@ describe("recommendCreators", () => {
     ).creators;
 
     const exact = recommendCreators(creators, query(1_500_000));
-    expect(exact.sections[0].items.slice(0, 3).map((item) => [item.creator.creatorId, item.score])).toEqual([
-      ["C0071", 78.9],
-      ["C0080", 65.2],
-      ["C0165", 46.2],
-    ]);
+    const exactItems = exact.sections.flatMap(({ items }) => items);
+    expect(exactItems.reduce(
+      (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
+      0,
+    )).toBeLessThanOrEqual(1_500_000);
+    expect(exactItems.length).toBeGreaterThan(1);
 
-    const exploration = recommendCreators(creators, query(500_000, ["패션"]));
+    const exploration = recommendCreators(creators, query(1, ["패션"]));
     expect(exploration.outcome).toBe("exploration");
     expect(exploration.sections[0].items[0]).toMatchObject({
       creator: { creatorId: "C0011" },
@@ -263,10 +294,10 @@ describe("recommendCreators", () => {
 
     const relaxed = recommendCreators(creators, query(3_000_000, ["게임"], "macro"));
     expect(relaxed.outcome).toBe("segment-relaxed");
-    expect(relaxed.sections[0].items.slice(0, 2).map((item) => [item.creator.creatorId, item.score])).toEqual([
-      ["C0002", 52.4],
-      ["C0014", 48],
-    ]);
+    expect(relaxed.sections.flatMap(({ items }) => items).reduce(
+      (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
+      0,
+    )).toBeLessThanOrEqual(3_000_000);
   });
 });
 
@@ -282,7 +313,7 @@ describe("sortRecommendations", () => {
           advertiserRating: null,
         }),
       ],
-      query(1_500_000),
+      query(null),
     );
     const items = result.sections.flatMap(({ items }) => items);
     const original = [...items];

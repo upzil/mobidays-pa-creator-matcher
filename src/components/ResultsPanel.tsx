@@ -24,6 +24,12 @@ const sortOptions: Array<{ value: SortMode; label: string }> = [
   { value: "budget", label: "협업비 낮은 순" },
 ];
 
+const currencyFormatter = new Intl.NumberFormat("ko-KR", {
+  style: "currency",
+  currency: "KRW",
+  maximumFractionDigits: 0,
+});
+
 const sectionCopy: Record<RecommendationSection["tier"], { title: string; description: string }> = {
   exact: {
     title: "조건에 맞는 추천",
@@ -33,13 +39,9 @@ const sectionCopy: Record<RecommendationSection["tier"], { title: string; descri
     title: "함께 살펴볼 탐색 후보",
     description: "카테고리와 규모는 맞지만 협업 이력이 없어 비용과 만족도 확인이 필요해요.",
   },
-  "budget-relaxed": {
-    title: "예산을 조금 넓힌 대안",
-    description: "정확한 후보가 없어, 총예산의 1인당 환산 기준보다 최대 20% 높은 후보를 찾았어요.",
-  },
   "segment-relaxed": {
     title: "규모를 넓힌 대안",
-    description: "1인당 환산 예산 안에서 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
+    description: "총예산 안에서 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
   },
 };
 
@@ -89,6 +91,18 @@ export function ResultsPanel({
     (creator) => !recommendedIds.has(creator.creatorId),
   );
   const goalProfile = CAMPAIGN_GOAL_PROFILES[result.appliedQuery.goal];
+  const selectedItems = sections.flatMap((section) => section.items);
+  const hasUnknownCost = selectedItems.some(
+    (item) => item.creator.avgCampaignBudgetKrw === null,
+  );
+  const selectedCostKrw = selectedItems.reduce(
+    (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
+    0,
+  );
+  const combinationBudgetNote =
+    result.appliedQuery.totalBudgetKrw !== null && !hasUnknownCost
+      ? `조합 예상 비용 ${currencyFormatter.format(selectedCostKrw)} · 잔여 ${currencyFormatter.format(result.appliedQuery.totalBudgetKrw - selectedCostKrw)}`
+      : null;
 
   return (
     <div className="results-content">
@@ -104,6 +118,9 @@ export function ResultsPanel({
             <p className="goal-weight-note">
               <strong>{goalProfile.scoringNote}</strong>
               <span>{goalProfile.weightSummary}</span>
+              {combinationBudgetNote && (
+                <span className="combination-budget-note">{combinationBudgetNote}</span>
+              )}
             </p>
             <label htmlFor="sort-results">
               <span>결과 정렬</span>

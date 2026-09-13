@@ -48,16 +48,11 @@ const segmentOptions: Array<{
   { value: "macro", label: "매크로", range: "10만 명 이상" },
 ];
 
-const formatBudget = (value: string, desiredCreatorCount: string) => {
+const formatBudget = (value: string) => {
   if (value === "") return "비우면 예산 제한 없이 추천해요.";
   if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
-  const count = Number(desiredCreatorCount);
   const totalManwon = new Intl.NumberFormat("ko-KR").format(Number(value));
-  if (!Number.isSafeInteger(count) || count < 1) return `총 ${totalManwon}만원`;
-  const perCreatorManwon = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(
-    Number(value) / count,
-  );
-  return `총 ${totalManwon}만원 · 1인당 약 ${perCreatorManwon}만원 기준`;
+  return `총 ${totalManwon}만원 안에서 가장 적합한 조합을 찾아요.`;
 };
 
 function categorySummary(categories: readonly Category[]): string {
@@ -110,12 +105,13 @@ export function CampaignForm({
         </div>
 
         <div className="field-group">
-          <label htmlFor="desired-creator-count">추천 인원</label>
+          <label htmlFor="desired-creator-count">추천 인원 <span className="optional-label" aria-hidden="true">선택</span></label>
           <div className="unit-input-wrap">
             <input
               ref={desiredCreatorCountRef}
               id="desired-creator-count"
               name="desiredCreatorCount"
+              aria-label="추천 인원"
               type="number"
               inputMode="numeric"
               min="1"
@@ -126,10 +122,11 @@ export function CampaignForm({
               aria-invalid={Boolean(errors.desiredCreatorCount)}
               aria-describedby={`count-help${errors.desiredCreatorCount ? " count-error" : ""}`}
               onChange={(event) => onDesiredCreatorCountChange(event.target.value)}
+              placeholder="제한 없음"
             />
             <span aria-hidden="true">명</span>
           </div>
-          <p id="count-help" className="field-help">기본 5명 · 최대 20명</p>
+          <p id="count-help" className="field-help">비우면 인원수 제한 없이 추천해요. · 최대 20명</p>
           {errors.desiredCreatorCount && (
             <p id="count-error" className="field-error">{errors.desiredCreatorCount}</p>
           )}
@@ -157,7 +154,7 @@ export function CampaignForm({
             <span aria-hidden="true">만원</span>
           </div>
           <p id="budget-help" className="field-help">
-            {formatBudget(draft.budgetManwon, draft.desiredCreatorCount)}
+            {formatBudget(draft.budgetManwon)}
           </p>
           {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
         </div>

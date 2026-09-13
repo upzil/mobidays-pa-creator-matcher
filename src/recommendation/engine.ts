@@ -60,6 +60,7 @@ interface ScoreContext {
   segmentCreators: readonly Creator[];
   globalRatingMean: number;
   ratingPercentiles: ReadonlyMap<string, number>;
+  budgetPercentiles: ReadonlyMap<string, number>;
 }
 
 function buildScoreContext(
@@ -87,13 +88,26 @@ function buildScoreContext(
       averageRankPercentile(value, population),
     ]),
   );
+  const knownBudgets = segmentCreators.filter(
+    (creator): creator is Creator & { avgCampaignBudgetKrw: number } =>
+      creator.avgCampaignBudgetKrw !== null,
+  );
+  const budgetPopulation = knownBudgets.map(
+    (creator) => creator.avgCampaignBudgetKrw,
+  );
+  const budgetPercentiles = new Map(
+    knownBudgets.map((creator) => [
+      creator.creatorId,
+      averageRankPercentile(creator.avgCampaignBudgetKrw, budgetPopulation),
+    ]),
+  );
 
-  return { segmentCreators, globalRatingMean, ratingPercentiles };
+  return { segmentCreators, globalRatingMean, ratingPercentiles, budgetPercentiles };
 }
 
 function makeBreakdown(
   creator: Creator,
-  perCreatorBudgetKrw: number | null,
+  totalBudgetKrw: number | null,
   context: ScoreContext,
   goal: CampaignGoal,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
@@ -126,9 +140,9 @@ function makeBreakdown(
       ? 0.5
       : (context.ratingPercentiles.get(creator.creatorId) ?? 0.5);
   const budgetEfficiency =
-    perCreatorBudgetKrw === null || creator.avgCampaignBudgetKrw === null
+    totalBudgetKrw === null || creator.avgCampaignBudgetKrw === null
       ? 0.5
-      : perCreatorBudgetKrw / (perCreatorBudgetKrw + creator.avgCampaignBudgetKrw);
+      : 1 - (context.budgetPercentiles.get(creator.creatorId) ?? 0.5);
 
   return {
     adjustedRating,
@@ -228,7 +242,6 @@ function makeReasons(
   creator: Creator,
   tier: MatchTier,
   breakdown: ScoreBreakdown,
-  budgetOverageRate: number | null,
   hasCategoryFilter: boolean,
   hasBudgetFilter: boolean,
 ): RecommendationReason[] {
@@ -245,18 +258,13 @@ function makeReasons(
     if (hasBudgetFilter) {
       reasons.push({
         code: "within-budget",
-        message: "평균 협업비가 총예산의 1인당 환산 기준 안에 들어와요.",
+        message: "선택된 조합의 예상 협업비 합계가 총예산 안에 들어와요.",
       });
     }
   } else if (tier === "exploration") {
     reasons.push({
       code: "missing-history",
       message: "신규 탐색 후보로 협업비와 만족도 확인이 필요해요.",
-    });
-  } else if (tier === "budget-relaxed") {
-    reasons.push({
-      code: "budget-relaxed",
-      message: `1인당 환산 예산보다 ${(100 * (budgetOverageRate ?? 0)).toFixed(1)}% 높지만 20% 이내의 대안이에요.`,
     });
   } else {
     reasons.push({
@@ -281,7 +289,7 @@ function makeReasons(
 function scoreCreator(
   creator: Creator,
   tier: MatchTier,
-  perCreatorBudgetKrw: number | null,
+  totalBudgetKrw: number | null,
   context: ScoreContext,
   requestedSegment: FollowerSegment | null,
   goal: CampaignGoal,
@@ -289,7 +297,7 @@ function scoreCreator(
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
-    perCreatorBudgetKrw,
+    totalBudgetKrw,
     context,
     goal,
   );
@@ -297,20 +305,11 @@ function scoreCreator(
     (sum, scoreComponent) => sum + scoreComponent.contribution,
     0,
   );
-  const budgetOverageRate =
-    perCreatorBudgetKrw === null || creator.avgCampaignBudgetKrw === null
-      ? null
-      : Math.max(0, creator.avgCampaignBudgetKrw / perCreatorBudgetKrw - 1);
   const warnings: string[] = [];
 
   if (creator.totalCampaignCount === 0) {
     warnings.push(
       "캠페인 이력이 없어 평균 협업비와 광고주 평점을 직접 확인해야 해요.",
-    );
-  }
-  if (tier === "budget-relaxed" && budgetOverageRate !== null) {
-    warnings.push(
-      `평균 협업비가 총예산의 1인당 환산 기준보다 ${(budgetOverageRate * 100).toFixed(1)}% 높아요.`,
     );
   }
   if (tier === "segment-relaxed" && requestedSegment !== null) {
@@ -330,12 +329,10 @@ function scoreCreator(
       creator,
       tier,
       breakdown,
-      budgetOverageRate,
       hasCategoryFilter,
-      perCreatorBudgetKrw !== null,
+      totalBudgetKrw !== null,
     ),
     warnings,
-    budgetOverageRate,
   };
 }
 
@@ -392,6 +389,121 @@ function adjacentSegments(segment: FollowerSegment): FollowerSegment[] {
   return ["nano", "macro"];
 }
 
+interface CombinationState {
+  costKrw: number;
+  score: number;
+  items: RecommendedCreator[];
+  key: string;
+}
+
+const SCORE_EPSILON = 1e-9;
+
+function isBetterCombination(
+  candidate: CombinationState,
+  current: CombinationState | undefined,
+): boolean {
+  if (!current) return true;
+  if (candidate.score > current.score + SCORE_EPSILON) return true;
+  if (current.score > candidate.score + SCORE_EPSILON) return false;
+  if (candidate.costKrw !== current.costKrw) {
+    return candidate.costKrw < current.costKrw;
+  }
+  return candidate.key.localeCompare(current.key) < 0;
+}
+
+function pruneDominatedStates(
+  states: ReadonlyMap<number, CombinationState>,
+): Map<number, CombinationState> {
+  const ordered = [...states.values()].sort(
+    (a, b) => a.costKrw - b.costKrw || b.score - a.score || a.key.localeCompare(b.key),
+  );
+  const frontier = new Map<number, CombinationState>();
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (const state of ordered) {
+    if (state.score <= bestScore + SCORE_EPSILON) continue;
+    frontier.set(state.costKrw, state);
+    bestScore = state.score;
+  }
+
+  return frontier;
+}
+
+function bestCombination(
+  states: ReadonlyMap<number, CombinationState>,
+): CombinationState | undefined {
+  let best: CombinationState | undefined;
+  for (const state of states.values()) {
+    if (isBetterCombination(state, best)) best = state;
+  }
+  return best;
+}
+
+function selectOptimalCombination(
+  candidates: readonly RecommendedCreator[],
+  totalBudgetKrw: number | null,
+  desiredCreatorCount: number | null,
+): RecommendedCreator[] {
+  const ordered = [...candidates].sort((a, b) =>
+    a.creator.creatorId.localeCompare(b.creator.creatorId),
+  );
+  if (ordered.length === 0) return [];
+
+  if (totalBudgetKrw === null) {
+    const limit = desiredCreatorCount ?? ordered.length;
+    return sortRecommendations(ordered, "recommended").slice(0, limit);
+  }
+
+  const priced = ordered.filter(
+    (item): item is RecommendedCreator & {
+      creator: Creator & { avgCampaignBudgetKrw: number };
+    } => item.creator.avgCampaignBudgetKrw !== null,
+  );
+  if (priced.length === 0) return [];
+
+  const targetCount = desiredCreatorCount === null
+    ? priced.length
+    : desiredCreatorCount;
+  const frontiers = Array.from(
+    { length: targetCount + 1 },
+    () => new Map<number, CombinationState>(),
+  );
+  frontiers[0].set(0, { costKrw: 0, score: 0, items: [], key: "" });
+
+  for (const item of priced) {
+    const itemCost = item.creator.avgCampaignBudgetKrw;
+    for (let count = targetCount; count >= 1; count -= 1) {
+      const next = new Map(frontiers[count]);
+      for (const state of frontiers[count - 1].values()) {
+        const costKrw = state.costKrw + itemCost;
+        if (costKrw > totalBudgetKrw) continue;
+        const items = [...state.items, item];
+        const candidate: CombinationState = {
+          costKrw,
+          score: state.score + item.scoreRaw,
+          items,
+          key: items.map(({ creator }) => creator.creatorId).join("|"),
+        };
+        const current = next.get(costKrw);
+        if (isBetterCombination(candidate, current)) next.set(costKrw, candidate);
+      }
+      frontiers[count] = pruneDominatedStates(next);
+    }
+  }
+
+  let selected: CombinationState | undefined;
+  if (desiredCreatorCount !== null) {
+    selected = bestCombination(frontiers[targetCount]);
+  } else {
+    for (let count = 1; count <= targetCount; count += 1) {
+      const candidate = bestCombination(frontiers[count]);
+      if (candidate && isBetterCombination(candidate, selected)) selected = candidate;
+    }
+  }
+
+  return selected ? sortRecommendations(selected.items, "recommended") : [];
+}
+
 function assertQuery(query: RecommendationQuery): void {
   if (
     query.totalBudgetKrw !== null &&
@@ -409,11 +521,12 @@ function assertQuery(query: RecommendationQuery): void {
     throw new RangeError("지원하지 않는 캠페인 목적입니다.");
   }
   if (
-    !Number.isSafeInteger(query.desiredCreatorCount) ||
-    query.desiredCreatorCount < 1 ||
-    query.desiredCreatorCount > 20
+    query.desiredCreatorCount !== null &&
+    (!Number.isSafeInteger(query.desiredCreatorCount) ||
+      query.desiredCreatorCount < 1 ||
+      query.desiredCreatorCount > 20)
   ) {
-    throw new RangeError("desiredCreatorCount는 1 이상 20 이하의 안전한 정수여야 합니다.");
+    throw new RangeError("desiredCreatorCount는 null이거나 1 이상 20 이하의 안전한 정수여야 합니다.");
   }
 }
 
@@ -444,9 +557,6 @@ export function recommendCreators(
       ? 3
       : knownRatings.reduce((sum, rating) => sum + rating, 0) / knownRatings.length;
   const contexts = new Map<FollowerSegment, ScoreContext>();
-  const perCreatorBudgetKrw = query.totalBudgetKrw === null
-    ? null
-    : query.totalBudgetKrw / query.desiredCreatorCount;
   const contextFor = (segment: FollowerSegment): ScoreContext => {
     const existing = contexts.get(segment);
     if (existing) return existing;
@@ -458,7 +568,7 @@ export function recommendCreators(
     scoreCreator(
       creator,
       tier,
-      perCreatorBudgetKrw,
+      query.totalBudgetKrw,
       contextFor(creator.segment),
       query.segment,
       query.goal,
@@ -466,114 +576,75 @@ export function recommendCreators(
     );
   const makeSection = (
     tier: MatchTier,
-    candidates: readonly Creator[],
+    items: readonly RecommendedCreator[],
     segment?: FollowerSegment,
   ): RecommendationSection => ({
     tier,
     ...(segment ? { segment } : {}),
-    items: sortRecommendations(
-      candidates.map((creator) => score(creator, tier)),
-      "recommended",
-    ),
+    items: sortRecommendations(items, "recommended"),
   });
-
-  const limitSections = (
-    sections: readonly RecommendationSection[],
-  ): RecommendationSection[] => {
-    let remaining = query.desiredCreatorCount;
-    return sections.flatMap((section) => {
-      if (remaining === 0) return [];
-      const items = section.items.slice(0, remaining);
-      remaining -= items.length;
-      return items.length > 0 ? [{ ...section, items }] : [];
-    });
-  };
-
-  const exact = sameSegment.filter(
-    (creator) =>
-      perCreatorBudgetKrw === null ||
-      (creator.avgCampaignBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw <= perCreatorBudgetKrw),
-  );
-  const exploration = sameSegment.filter(
-    (creator) => perCreatorBudgetKrw !== null && creator.avgCampaignBudgetKrw === null,
+  const exactPool = query.totalBudgetKrw === null
+    ? sameSegment
+    : sameSegment.filter((creator) => creator.avgCampaignBudgetKrw !== null);
+  const exact = selectOptimalCombination(
+    exactPool.map((creator) => score(creator, "exact")),
+    query.totalBudgetKrw,
+    query.desiredCreatorCount,
   );
 
   if (exact.length > 0) {
-    const sections = [makeSection("exact", exact, query.segment ?? undefined)];
-    if (exploration.length > 0) {
-      sections.push(makeSection("exploration", exploration, query.segment ?? undefined));
-    }
     return {
       appliedQuery,
       outcome: "exact",
-      sections: limitSections(sections),
+      sections: [makeSection("exact", exact, query.segment ?? undefined)],
       attemptedRelaxations: [],
       diagnostics: [],
     };
   }
 
-  const budgetRelaxed = perCreatorBudgetKrw === null ? [] : sameSegment.filter((creator) => {
-    const cost = creator.avgCampaignBudgetKrw;
-    return (
-      cost !== null &&
-      cost > perCreatorBudgetKrw &&
-      cost * 5 <= perCreatorBudgetKrw * 6
-    );
-  });
-  if (budgetRelaxed.length > 0) {
-    return {
-      appliedQuery,
-      outcome: "budget-relaxed",
-      sections: limitSections([
-        makeSection("budget-relaxed", budgetRelaxed, query.segment ?? undefined),
-      ]),
-      attemptedRelaxations: ["budget-20-percent"],
-      diagnostics: [
-        "정확히 일치하는 후보가 없어 같은 카테고리와 규모에서 1인당 환산 예산을 최대 20%까지 완화했어요.",
-      ],
-    };
-  }
-
   const adjacent = query.segment === null ? [] : adjacentSegments(query.segment);
+  const adjacentPool = relevant.filter(
+    (creator) =>
+      adjacent.includes(creator.segment) &&
+      (query.totalBudgetKrw === null || creator.avgCampaignBudgetKrw !== null),
+  );
+  const segmentSelection = selectOptimalCombination(
+    adjacentPool.map((creator) => score(creator, "segment-relaxed")),
+    query.totalBudgetKrw,
+    query.desiredCreatorCount,
+  );
   const segmentSections = adjacent.flatMap((segment) => {
-    const candidates = relevant.filter(
-      (creator) =>
-        creator.segment === segment &&
-        perCreatorBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw <= perCreatorBudgetKrw,
-    );
-    return candidates.length > 0
-      ? [makeSection("segment-relaxed", candidates, segment)]
-      : [];
+    const items = segmentSelection.filter((item) => item.creator.segment === segment);
+    return items.length > 0 ? [makeSection("segment-relaxed", items, segment)] : [];
   });
   if (segmentSections.length > 0) {
     return {
       appliedQuery,
       outcome: "segment-relaxed",
-      sections: limitSections(segmentSections),
-      attemptedRelaxations: ["budget-20-percent", "adjacent-segment"],
+      sections: segmentSections,
+      attemptedRelaxations: ["adjacent-segment"],
       diagnostics: [
-        "정확한 예산·규모 후보가 없어 같은 카테고리의 인접 규모 대안을 보여드려요.",
+        "요청한 규모에서 총예산을 지키는 조합이 없어 같은 카테고리의 인접 규모 대안을 보여드려요.",
       ],
     };
   }
 
+  const exploration = query.totalBudgetKrw === null
+    ? []
+    : sameSegment.filter((creator) => creator.avgCampaignBudgetKrw === null);
   if (exploration.length > 0) {
+    const explorationLimit = query.desiredCreatorCount ?? exploration.length;
+    const explorationItems = sortRecommendations(
+      exploration.map((creator) => score(creator, "exploration")),
+      "recommended",
+    ).slice(0, explorationLimit);
     return {
       appliedQuery,
       outcome: "exploration",
-      sections: limitSections([
-        makeSection("exploration", exploration, query.segment ?? undefined),
-      ]),
-      attemptedRelaxations: [
-        "budget-20-percent",
-        "adjacent-segment",
-        "unknown-cost",
-      ],
+      sections: [makeSection("exploration", explorationItems, query.segment ?? undefined)],
+      attemptedRelaxations: ["adjacent-segment", "unknown-cost"],
       diagnostics: [
-        "예산이 확인된 후보가 없어 협업비와 만족도를 확인해야 하는 탐색 후보를 보여드려요.",
+        "총예산 충족 여부를 확인할 수 있는 후보가 없어 견적 확인이 필요한 탐색 후보를 보여드려요.",
       ],
     };
   }
@@ -582,13 +653,9 @@ export function recommendCreators(
     appliedQuery,
     outcome: "empty",
     sections: [],
-    attemptedRelaxations: [
-      "budget-20-percent",
-      "adjacent-segment",
-      "unknown-cost",
-    ],
+    attemptedRelaxations: ["adjacent-segment", "unknown-cost"],
     diagnostics: [
-      "선택한 카테고리·규모·총예산과 가까운 후보를 찾지 못했어요. 총예산을 높이거나 규모 또는 카테고리를 변경해 주세요.",
+      "선택한 카테고리·규모에서 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 규모 또는 카테고리를 변경해 주세요.",
     ],
   };
 }

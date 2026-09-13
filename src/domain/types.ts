@@ -22,7 +22,6 @@ export type CampaignGoal =
 export type MatchTier =
   | "exact"
   | "exploration"
-  | "budget-relaxed"
   | "segment-relaxed";
 export type SortMode =
   | "recommended"
@@ -82,7 +81,7 @@ export interface RecommendationQuery {
   categories: readonly Category[];
   segment: FollowerSegment | null;
   goal: CampaignGoal;
-  desiredCreatorCount: number;
+  desiredCreatorCount: number | null;
 }
 
 export interface ScoreWeights {
@@ -117,7 +116,6 @@ export interface RecommendationReason {
     | "high-views"
     | "strong-rating"
     | "campaign-experience"
-    | "budget-relaxed"
     | "segment-relaxed"
     | "missing-history"
     | "goal-fit";
@@ -133,7 +131,6 @@ export interface RecommendedCreator {
   breakdown: ScoreBreakdown;
   reasons: RecommendationReason[];
   warnings: string[];
-  budgetOverageRate: number | null;
 }
 
 export interface RecommendationSection {
@@ -144,7 +141,6 @@ export interface RecommendationSection {
 
 export type RecommendationOutcome =
   | "exact"
-  | "budget-relaxed"
   | "segment-relaxed"
   | "exploration"
   | "empty";
@@ -153,8 +149,6 @@ export interface RecommendationResult {
   appliedQuery: RecommendationQuery;
   outcome: RecommendationOutcome;
   sections: RecommendationSection[];
-  attemptedRelaxations: Array<
-    "budget-20-percent" | "adjacent-segment" | "unknown-cost"
-  >;
+  attemptedRelaxations: Array<"adjacent-segment" | "unknown-cost">;
   diagnostics: string[];
 }

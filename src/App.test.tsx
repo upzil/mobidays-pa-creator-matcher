@@ -73,7 +73,7 @@ describe("App", () => {
       "새로운채널",
     ]);
     expect(screen.getByLabelText("총 예산")).toBeEnabled();
-    expect(screen.getByLabelText("추천 인원")).toHaveValue(5);
+    expect(screen.getByLabelText("추천 인원")).toHaveValue(null);
     expect(screen.getByLabelText("캠페인 목적")).toHaveValue("balanced");
     expect(screen.getByLabelText(/크리에이터 규모/)).toHaveValue("");
     expect(screen.getByText("전체 카테고리")).toBeInTheDocument();
@@ -93,7 +93,7 @@ describe("App", () => {
     ]);
   });
 
-  it("선택 필터를 비워도 전체에서 기본 5명 이내를 추천한다", async () => {
+  it("추천 인원을 비우면 전체 후보를 인원 제한 없이 추천한다", async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
@@ -108,23 +108,24 @@ describe("App", () => {
     expect(screen.queryByText(/선택해 주세요/)).not.toBeInTheDocument();
   });
 
-  it("유효 조건으로 정확 추천과 별도 탐색 후보를 표시한다", async () => {
+  it("유효 조건으로 총예산 안의 비용 확인 가능 후보만 추천한다", async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.type(screen.getByLabelText("총 예산"), "150");
-    expect(screen.getByText("총 150만원 · 1인당 약 30만원 기준")).toBeInTheDocument();
+    expect(screen.getByText("총 150만원 안에서 가장 적합한 조합을 찾아요.")).toBeInTheDocument();
     await user.click(screen.getByText("전체 카테고리"));
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
     await user.selectOptions(screen.getByLabelText(/크리에이터 규모/), "nano");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByText("게임채널")).toBeInTheDocument();
-    expect(screen.getByText("새로운채널")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "새로운채널", level: 3 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /조건에 맞는 추천/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /함께 살펴볼 탐색 후보/ })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "그 외 크리에이터 1명" })).toBeInTheDocument();
+    expect(screen.getByText("조합 예상 비용 ₩300,000 · 잔여 ₩1,200,000")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /함께 살펴볼 탐색 후보/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "그 외 크리에이터 2명" })).toBeInTheDocument();
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
     expect(screen.getByText("균형 탐색")).toBeInTheDocument();
@@ -161,7 +162,6 @@ describe("App", () => {
     render(<App />);
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
-    await user.clear(screen.getByLabelText("추천 인원"));
     await user.type(screen.getByLabelText("추천 인원"), "1");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
@@ -175,7 +175,6 @@ describe("App", () => {
     await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     const countInput = screen.getByLabelText("추천 인원");
-    await user.clear(countInput);
     await user.type(countInput, "0");
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 

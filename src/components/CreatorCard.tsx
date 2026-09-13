@@ -14,7 +14,6 @@ const currencyFormatter = new Intl.NumberFormat("ko-KR", {
 const tierLabels = {
   exact: "조건 일치",
   exploration: "비용 확인 필요",
-  "budget-relaxed": "예산 대안",
   "segment-relaxed": "규모 대안",
 } as const;
 

@@ -21,7 +21,7 @@ const initialDraft: CampaignDraft = {
   categories: [],
   segment: "",
   goal: "balanced",
-  desiredCreatorCount: "5",
+  desiredCreatorCount: "",
 };
 
 function validateDraft(draft: CampaignDraft): FormErrors {
@@ -36,9 +36,10 @@ function validateDraft(draft: CampaignDraft): FormErrors {
     errors.budget = "1만원 이상의 총 예산을 입력해 주세요.";
   }
   if (
-    !/^\d+$/.test(draft.desiredCreatorCount) ||
-    Number(draft.desiredCreatorCount) < 1 ||
-    Number(draft.desiredCreatorCount) > 20
+    draft.desiredCreatorCount !== "" &&
+    (!/^\d+$/.test(draft.desiredCreatorCount) ||
+      Number(draft.desiredCreatorCount) < 1 ||
+      Number(draft.desiredCreatorCount) > 20)
   ) {
     errors.desiredCreatorCount = "추천 인원은 1명에서 20명 사이로 입력해 주세요.";
   }
@@ -51,7 +52,7 @@ function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | nu
     (draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000) === query.totalBudgetKrw &&
     (draft.segment || null) === query.segment &&
     draft.goal === query.goal &&
-    Number(draft.desiredCreatorCount) === query.desiredCreatorCount &&
+    (draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount)) === query.desiredCreatorCount &&
     draft.categories.length === query.categories.length &&
     draft.categories.every((category) => query.categories.includes(category))
   );
@@ -143,7 +144,7 @@ function App() {
       categories: draft.categories,
       segment: draft.segment || null,
       goal: draft.goal,
-      desiredCreatorCount: Number(draft.desiredCreatorCount),
+      desiredCreatorCount: draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount),
     };
     const nextResult = recommendCreators(creators, query);
     setResult(nextResult);
