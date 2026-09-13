@@ -16,6 +16,12 @@ const sortOptions: Array<{ value: SortMode; label: string }> = [
   { value: "budget", label: "협업비 낮은 순" },
 ];
 
+const currencyFormatter = new Intl.NumberFormat("ko-KR", {
+  style: "currency",
+  currency: "KRW",
+  maximumFractionDigits: 0,
+});
+
 const sectionCopy: Record<RecommendationSection["tier"], { title: string; description: string }> = {
   exact: {
     title: "조건에 맞는 추천",
@@ -76,6 +82,25 @@ export function ResultsPanel({
   const remainingCreators = creators.filter(
     (creator) => !recommendedIds.has(creator.creatorId),
   );
+  const selectedItems = sections.flatMap((section) => section.items);
+  const hasUnknownCost = selectedItems.some(
+    (item) => item.creator.avgCampaignBudgetKrw === null,
+  );
+  const usedBudgetKrw = selectedItems.reduce(
+    (sum, item) => sum + (item.creator.avgCampaignBudgetKrw ?? 0),
+    0,
+  );
+  const budgetStatus = result.appliedQuery.totalBudgetKrw === null
+    ? null
+    : hasUnknownCost
+      ? { used: "확인 필요", remaining: "확인 필요" }
+      : {
+          used: currencyFormatter.format(usedBudgetKrw),
+          remaining: currencyFormatter.format(
+            Math.max(0, result.appliedQuery.totalBudgetKrw - usedBudgetKrw),
+          ),
+        };
+
   return (
     <div className="results-content">
       {excludedRows > 0 && (
@@ -114,6 +139,18 @@ export function ResultsPanel({
                 </div>
               </header>
               <p className="section-description">{sectionCopy[section.tier].description}</p>
+              {sectionIndex === 0 && budgetStatus && (
+                <dl className="budget-status" aria-label="예산 계획 현황">
+                  <div>
+                    <dt>예상 집행액</dt>
+                    <dd>{budgetStatus.used}</dd>
+                  </div>
+                  <div>
+                    <dt>잔여 예산</dt>
+                    <dd>{budgetStatus.remaining}</dd>
+                  </div>
+                </dl>
+              )}
               <div className="creator-grid">
                 {section.items.map((item, index) => (
                   <CreatorCard item={item} rank={index + 1} key={item.creator.creatorId} />
@@ -149,7 +186,7 @@ export function ResultsPanel({
             excludedRows={0}
             sortMode={browseSortMode}
             onSortChange={onBrowseSortChange}
-            heading={`전체 크리에이터 ${creators.length}명`}
+            heading="전체 크리에이터"
             description="조건에 맞는 추천 후보는 없지만 전체 목록은 계속 탐색할 수 있어요."
           />
         </>

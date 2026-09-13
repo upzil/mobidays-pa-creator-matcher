@@ -110,6 +110,7 @@ describe("App", () => {
     expect(screen.getByText("게임채널")).toBeInTheDocument();
     expect(screen.getByText("새로운채널")).toBeInTheDocument();
     expect(screen.getByText("교육채널")).toBeInTheDocument();
+    expect(screen.queryByLabelText("예산 계획 현황")).not.toBeInTheDocument();
     expect(screen.queryByText("APPLIED CONDITIONS")).not.toBeInTheDocument();
     expect(screen.queryByText(/선택해 주세요/)).not.toBeInTheDocument();
   });
@@ -129,7 +130,11 @@ describe("App", () => {
     expect(await screen.findByText("게임채널")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "새로운채널", level: 3 })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /조건에 맞는 추천/ })).toBeInTheDocument();
-    expect(screen.queryByText(/조합 예상 비용/)).not.toBeInTheDocument();
+    const budgetStatus = screen.getByLabelText("예산 계획 현황");
+    expect(within(budgetStatus).getByText("예상 집행액")).toBeInTheDocument();
+    expect(within(budgetStatus).getByText("₩300,000")).toBeInTheDocument();
+    expect(within(budgetStatus).getByText("잔여 예산")).toBeInTheDocument();
+    expect(within(budgetStatus).getByText("₩1,200,000")).toBeInTheDocument();
     expect(screen.queryByText(/특정 지표에 치우치지 않도록/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /함께 살펴볼 탐색 후보/ })).not.toBeInTheDocument();
     const recommendationHeading = screen.getByRole("heading", { name: "조건에 맞는 추천" });
