@@ -187,21 +187,24 @@ describe("recommendCreators", () => {
 
     expect(awareness.sections[0].items[0].creator.creatorId).toBe("REACH");
     expect(engagement.sections[0].items[0].creator.creatorId).toBe("CONVERT");
-    expect(awareness.sections[0].items[0].breakdown.views.weight).toBe(0.45);
-    expect(engagement.sections[0].items[0].breakdown.engagement.weight).toBe(0.45);
+    expect(awareness.sections[0].items[0].breakdown.views.weight).toBe(0.4);
+    expect(engagement.sections[0].items[0].breakdown.engagement.weight).toBe(0.4);
   });
 
   it("슬라이더 전 구간의 가중치 합이 100%다", () => {
     for (const position of [0, 25, 50, 75, 100]) {
       const profile = getCampaignGoalProfile(position);
       expect(Object.values(profile.weights).reduce((sum, weight) => sum + weight, 0)).toBeCloseTo(1);
+      expect(profile.weights.rating).toBe(0.2);
+      expect(profile.weights.experience).toBe(0.15);
+      expect(profile.weights.budgetEfficiency).toBe(0.1);
     }
 
     expect(getCampaignGoalProfile(75).weights).toEqual({
-      engagement: 0.375,
-      views: 0.225,
-      rating: 0.175,
-      experience: 0.125,
+      engagement: 0.3375,
+      views: 0.21250000000000002,
+      rating: 0.2,
+      experience: 0.15,
       budgetEfficiency: 0.1,
     });
   });
@@ -320,7 +323,7 @@ describe("recommendCreators", () => {
     expect(exploration.outcome).toBe("exploration");
     expect(exploration.sections[0].items[0]).toMatchObject({
       creator: { creatorId: "C0011" },
-      score: 45.7,
+      score: 45.4,
     });
 
     const relaxed = recommendCreators(creators, query(3_000_000, ["게임"], "macro"));

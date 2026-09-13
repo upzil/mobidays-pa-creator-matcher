@@ -163,7 +163,8 @@ describe("App", () => {
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
     expect(screen.getByText("균형 탐색")).toBeInTheDocument();
-    expect(screen.getAllByText(/참여율 30% · 조회수 25%/)).toHaveLength(1);
+    expect(screen.getByText(/조정 가중치 · 참여율 27.5% · 조회수 27.5%/)).toBeInTheDocument();
+    expect(screen.getByText(/평점 20% · 경험 15% · 예산 10%는 고정/)).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("총 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
@@ -183,13 +184,13 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByText("노출 중심")).toBeInTheDocument();
-    expect(screen.getAllByText(/조회수 45% · 참여율 20%/)).toHaveLength(1);
+    expect(screen.getByText(/조정 가중치 · 조회수 40% · 참여율 15%/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "100" } });
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByText("참여 중심")).toBeInTheDocument();
-    expect(screen.getAllByText(/참여율 45% · 조회수 20%/)).toHaveLength(1);
+    expect(screen.getByText(/조정 가중치 · 참여율 40% · 조회수 15%/)).toBeInTheDocument();
   });
 
   it("추천 인원으로 노출 후보 수를 제한한다", async () => {

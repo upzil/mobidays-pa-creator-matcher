@@ -19,12 +19,12 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "노출 확대",
     description: "평균 조회수를 중심으로 실제 도달 가능성을 봐요.",
     scoringNote: "노출 목적에 맞춰 평균 조회수를 가장 크게 반영했어요.",
-    weightSummary: "조회수 45% · 참여율 20% · 평점 15% · 경험 10% · 예산 10%",
+    weightSummary: "조회수 40% · 참여율 15%",
     weights: {
-      engagement: 0.2,
-      views: 0.45,
-      rating: 0.15,
-      experience: 0.1,
+      engagement: 0.15,
+      views: 0.4,
+      rating: 0.2,
+      experience: 0.15,
       budgetEfficiency: 0.1,
     },
   },
@@ -32,10 +32,10 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "균형 탐색",
     description: "성과·신뢰·비용을 고르게 비교해요.",
     scoringNote: "특정 지표에 치우치지 않도록 성과·신뢰·비용을 균형 있게 반영했어요.",
-    weightSummary: "참여율 30% · 조회수 25% · 평점 20% · 경험 15% · 예산 10%",
+    weightSummary: "참여율 27.5% · 조회수 27.5%",
     weights: {
-      engagement: 0.3,
-      views: 0.25,
+      engagement: 0.275,
+      views: 0.275,
       rating: 0.2,
       experience: 0.15,
       budgetEfficiency: 0.1,
@@ -45,12 +45,12 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "참여 중심",
     description: "참여율을 중심으로 반응 가능성을 봐요.",
     scoringNote: "참여 중심 설정에 맞춰 참여율을 가장 크게 반영했어요.",
-    weightSummary: "참여율 45% · 조회수 20% · 평점 15% · 경험 10% · 예산 10%",
+    weightSummary: "참여율 40% · 조회수 15%",
     weights: {
-      engagement: 0.45,
-      views: 0.2,
-      rating: 0.15,
-      experience: 0.1,
+      engagement: 0.4,
+      views: 0.15,
+      rating: 0.2,
+      experience: 0.15,
       budgetEfficiency: 0.1,
     },
   },
@@ -76,13 +76,10 @@ function formatPercent(value: number): string {
   return Number.isInteger(percent) ? `${percent}%` : `${percent.toFixed(1)}%`;
 }
 
-function summarizeWeights(weights: ScoreWeights): string {
+function summarizeAdjustableWeights(weights: ScoreWeights): string {
   const entries = [
     { label: "참여율", value: weights.engagement },
     { label: "조회수", value: weights.views },
-    { label: "평점", value: weights.rating },
-    { label: "경험", value: weights.experience },
-    { label: "예산", value: weights.budgetEfficiency },
   ].sort((a, b) => b.value - a.value);
 
   return entries.map(({ label, value }) => `${label} ${formatPercent(value)}`).join(" · ");
@@ -124,7 +121,7 @@ export function getCampaignGoalProfile(position: number): CampaignGoalProfile {
     label,
     description,
     scoringNote,
-    weightSummary: summarizeWeights(weights),
+    weightSummary: summarizeAdjustableWeights(weights),
     weights,
   };
 }

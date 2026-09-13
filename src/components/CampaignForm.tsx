@@ -125,7 +125,8 @@ export function CampaignForm({
             </div>
           </div>
           <p className="field-help">{goalProfile.description}</p>
-          <p className="goal-slider-weights">{goalProfile.weightSummary}</p>
+          <p className="goal-slider-weights">조정 가중치 · {goalProfile.weightSummary}</p>
+          <p className="field-help">평점 20% · 경험 15% · 예산 10%는 고정 반영돼요.</p>
         </div>
 
         <div className="required-filter-row">
