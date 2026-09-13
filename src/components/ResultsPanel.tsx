@@ -33,7 +33,7 @@ const sortOptions: Array<{ value: SortMode; label: string }> = [
 const sectionCopy: Record<RecommendationSection["tier"], { title: string; description: string }> = {
   exact: {
     title: "조건에 맞는 추천",
-    description: "카테고리와 규모가 일치하고, 과거 평균 협업비가 예산 안에 있는 후보예요.",
+    description: "선택한 필터와 캠페인 목적을 기준으로 우선순위를 계산했어요.",
   },
   exploration: {
     title: "함께 살펴볼 탐색 후보",
@@ -104,10 +104,11 @@ export function ResultsPanel({
           <h2>{itemCount > 0 ? `${itemCount}명의 후보를 찾았어요` : "조건에 맞는 후보가 없어요"}</h2>
         </div>
         <dl>
-          <div><dt>예산</dt><dd>{currencyFormatter.format(result.appliedQuery.budgetKrw)}</dd></div>
+          <div><dt>추천 인원</dt><dd>{result.appliedQuery.desiredCreatorCount}명</dd></div>
+          <div><dt>예산</dt><dd>{result.appliedQuery.budgetKrw === null ? "제한 없음" : currencyFormatter.format(result.appliedQuery.budgetKrw)}</dd></div>
           <div><dt>목적</dt><dd>{goalProfile.label}</dd></div>
-          <div><dt>카테고리</dt><dd>{result.appliedQuery.categories.join(", ")}</dd></div>
-          <div><dt>규모</dt><dd>{segmentLabels[result.appliedQuery.segment]}</dd></div>
+          <div><dt>카테고리</dt><dd>{result.appliedQuery.categories.length === 0 ? "전체" : result.appliedQuery.categories.join(", ")}</dd></div>
+          <div><dt>규모</dt><dd>{result.appliedQuery.segment === null ? "전체" : segmentLabels[result.appliedQuery.segment]}</dd></div>
         </dl>
         <button type="button" className="text-button" onClick={onFocusBudget}>조건 수정</button>
       </div>

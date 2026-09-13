@@ -78,10 +78,11 @@ export interface ParsedCreators {
 }
 
 export interface RecommendationQuery {
-  budgetKrw: number;
+  budgetKrw: number | null;
   categories: readonly Category[];
-  segment: FollowerSegment;
+  segment: FollowerSegment | null;
   goal: CampaignGoal;
+  desiredCreatorCount: number;
 }
 
 export interface ScoreWeights {
@@ -118,7 +119,8 @@ export interface RecommendationReason {
     | "campaign-experience"
     | "budget-relaxed"
     | "segment-relaxed"
-    | "missing-history";
+    | "missing-history"
+    | "goal-fit";
   message: string;
 }
 

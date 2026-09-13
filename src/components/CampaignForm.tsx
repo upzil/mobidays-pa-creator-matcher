@@ -11,14 +11,13 @@ export interface CampaignDraft {
   budget: string;
   categories: Category[];
   segment: FollowerSegment | "";
-  goal: CampaignGoal | "";
+  goal: CampaignGoal;
+  desiredCreatorCount: string;
 }
 
 export interface FormErrors {
   budget?: string;
-  categories?: string;
-  segment?: string;
-  goal?: string;
+  desiredCreatorCount?: string;
 }
 
 interface CampaignFormProps {
@@ -27,12 +26,14 @@ interface CampaignFormProps {
   isDirty: boolean;
   disabled: boolean;
   budgetRef: RefObject<HTMLInputElement | null>;
-  categoryRef: RefObject<HTMLInputElement | null>;
-  segmentRef: RefObject<HTMLInputElement | null>;
-  goalRef: RefObject<HTMLInputElement | null>;
+  desiredCreatorCountRef: RefObject<HTMLInputElement | null>;
+  categoryRef: RefObject<HTMLElement | null>;
+  segmentRef: RefObject<HTMLSelectElement | null>;
+  goalRef: RefObject<HTMLSelectElement | null>;
   onBudgetChange: (value: string) => void;
+  onDesiredCreatorCountChange: (value: string) => void;
   onCategoryChange: (category: Category, checked: boolean) => void;
-  onSegmentChange: (segment: FollowerSegment) => void;
+  onSegmentChange: (segment: FollowerSegment | "") => void;
   onGoalChange: (goal: CampaignGoal) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
@@ -48,9 +49,16 @@ const segmentOptions: Array<{
 ];
 
 const formatBudget = (value: string) => {
-  if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 입력해 주세요";
+  if (value === "") return "비우면 예산 제한 없이 추천해요.";
+  if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
   return `${new Intl.NumberFormat("ko-KR").format(Number(value))}원`;
 };
+
+function categorySummary(categories: readonly Category[]): string {
+  if (categories.length === 0) return "전체 카테고리";
+  if (categories.length <= 2) return categories.join(", ");
+  return `${categories[0]} 외 ${categories.length - 1}개`;
+}
 
 export function CampaignForm({
   draft,
@@ -58,10 +66,12 @@ export function CampaignForm({
   isDirty,
   disabled,
   budgetRef,
+  desiredCreatorCountRef,
   categoryRef,
   segmentRef,
   goalRef,
   onBudgetChange,
+  onDesiredCreatorCountChange,
   onCategoryChange,
   onSegmentChange,
   onGoalChange,
@@ -72,110 +82,121 @@ export function CampaignForm({
       <div className="form-heading">
         <p className="eyebrow">CAMPAIGN BRIEF</p>
         <h2>추천 조건</h2>
-        <p>한 명과 협업할 때의 기준으로 입력해 주세요.</p>
+        <p>모든 필터는 선택 사항이에요. 비워두면 전체를 대상으로 추천합니다.</p>
       </div>
 
-      <fieldset className="field-group" aria-describedby={errors.goal ? "goal-error" : "goal-help"}>
-        <legend>캠페인 목적</legend>
-        <p id="goal-help" className="field-help">목적에 따라 추천 점수의 지표별 비중이 달라져요.</p>
-        <div className="goal-list">
-          {CAMPAIGN_GOALS.map((goal, index) => {
-            const profile = CAMPAIGN_GOAL_PROFILES[goal];
-            return (
-              <label className="goal-control" key={goal}>
-                <input
-                  ref={index === 0 ? goalRef : undefined}
-                  type="radio"
-                  name="goal"
-                  value={goal}
-                  disabled={disabled}
-                  checked={draft.goal === goal}
-                  aria-invalid={Boolean(errors.goal)}
-                  onChange={() => onGoalChange(goal)}
-                />
-                <span className="goal-copy">
-                  <strong>{profile.label}</strong>
-                  <small>{profile.description}</small>
-                </span>
-              </label>
-            );
-          })}
-        </div>
-        {errors.goal && <p id="goal-error" className="field-error">{errors.goal}</p>}
-      </fieldset>
-
-      <div className="field-group">
-        <label htmlFor="budget">1인당 최대 예산</label>
-        <div className="budget-input-wrap">
-          <input
-            ref={budgetRef}
-            id="budget"
-            name="budget"
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
+      <div className="compact-filter-grid">
+        <div className="field-group field-span-full">
+          <label htmlFor="goal">캠페인 목적</label>
+          <select
+            ref={goalRef}
+            id="goal"
+            name="goal"
             disabled={disabled}
-            value={draft.budget}
-            aria-invalid={Boolean(errors.budget)}
-            aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}`}
-            onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
-            placeholder="예: 1500000"
-          />
-          <span aria-hidden="true">원</span>
+            value={draft.goal}
+            onChange={(event) => onGoalChange(event.target.value as CampaignGoal)}
+          >
+            {CAMPAIGN_GOALS.map((goal) => (
+              <option key={goal} value={goal}>{CAMPAIGN_GOAL_PROFILES[goal].label}</option>
+            ))}
+          </select>
+          <p className="field-help">{CAMPAIGN_GOAL_PROFILES[draft.goal].description}</p>
         </div>
-        <p id="budget-help" className="field-help">{formatBudget(draft.budget)}</p>
-        {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
+
+        <div className="field-group">
+          <label htmlFor="desired-creator-count">추천 인원</label>
+          <div className="unit-input-wrap">
+            <input
+              ref={desiredCreatorCountRef}
+              id="desired-creator-count"
+              name="desiredCreatorCount"
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max="20"
+              step="1"
+              disabled={disabled}
+              value={draft.desiredCreatorCount}
+              aria-invalid={Boolean(errors.desiredCreatorCount)}
+              aria-describedby={`count-help${errors.desiredCreatorCount ? " count-error" : ""}`}
+              onChange={(event) => onDesiredCreatorCountChange(event.target.value)}
+            />
+            <span aria-hidden="true">명</span>
+          </div>
+          <p id="count-help" className="field-help">기본 5명 · 최대 20명</p>
+          {errors.desiredCreatorCount && (
+            <p id="count-error" className="field-error">{errors.desiredCreatorCount}</p>
+          )}
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="budget">1인당 최대 예산 <span className="optional-label" aria-hidden="true">선택</span></label>
+          <div className="unit-input-wrap">
+            <input
+              ref={budgetRef}
+              id="budget"
+              name="budget"
+              aria-label="1인당 최대 예산"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="off"
+              disabled={disabled}
+              value={draft.budget}
+              aria-invalid={Boolean(errors.budget)}
+              aria-describedby={`budget-help${errors.budget ? " budget-error" : ""}`}
+              onChange={(event) => onBudgetChange(event.target.value.replace(/[^0-9]/g, ""))}
+              placeholder="제한 없음"
+            />
+            <span aria-hidden="true">원</span>
+          </div>
+          <p id="budget-help" className="field-help">{formatBudget(draft.budget)}</p>
+          {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="segment">크리에이터 규모 <span className="optional-label" aria-hidden="true">선택</span></label>
+          <select
+            ref={segmentRef}
+            id="segment"
+            name="segment"
+            aria-label="크리에이터 규모"
+            disabled={disabled}
+            value={draft.segment}
+            onChange={(event) => onSegmentChange(event.target.value as FollowerSegment | "")}
+          >
+            <option value="">전체 규모</option>
+            {segmentOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} · {option.range}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field-group">
+          <span className="field-label">카테고리 <span className="optional-label" aria-hidden="true">선택</span></span>
+          <details className="category-select">
+            <summary ref={categoryRef}>{categorySummary(draft.categories)}</summary>
+            <fieldset aria-label="카테고리">
+              <legend className="sr-only">카테고리</legend>
+              {CATEGORIES.map((category) => (
+                <label key={category}>
+                  <input
+                    type="checkbox"
+                    name="category"
+                    value={category}
+                    disabled={disabled}
+                    checked={draft.categories.includes(category)}
+                    onChange={(event) => onCategoryChange(category, event.target.checked)}
+                  />
+                  <span>{category}</span>
+                </label>
+              ))}
+            </fieldset>
+          </details>
+        </div>
       </div>
-
-      <fieldset className="field-group" aria-describedby={errors.categories ? "category-error" : undefined}>
-        <legend>카테고리</legend>
-        <p className="field-help">여러 개를 고르면 하나라도 일치하는 후보를 찾아요.</p>
-        <div className="choice-grid category-grid">
-          {CATEGORIES.map((category, index) => (
-            <label className="choice-control" key={category}>
-              <input
-                ref={index === 0 ? categoryRef : undefined}
-                type="checkbox"
-                name="category"
-                value={category}
-                disabled={disabled}
-                checked={draft.categories.includes(category)}
-                aria-invalid={Boolean(errors.categories)}
-                onChange={(event) => onCategoryChange(category, event.target.checked)}
-              />
-              <span>{category}</span>
-            </label>
-          ))}
-        </div>
-        {errors.categories && <p id="category-error" className="field-error">{errors.categories}</p>}
-      </fieldset>
-
-      <fieldset className="field-group" aria-describedby={errors.segment ? "segment-error" : "segment-help"}>
-        <legend>크리에이터 규모</legend>
-        <p id="segment-help" className="field-help">팔로워 수를 기준으로 구분해요.</p>
-        <div className="segment-list">
-          {segmentOptions.map((option, index) => (
-            <label className="segment-control" key={option.value}>
-              <input
-                ref={index === 0 ? segmentRef : undefined}
-                type="radio"
-                name="segment"
-                value={option.value}
-                disabled={disabled}
-                checked={draft.segment === option.value}
-                aria-invalid={Boolean(errors.segment)}
-                onChange={() => onSegmentChange(option.value)}
-              />
-              <span className="segment-copy">
-                <strong>{option.label}</strong>
-                <small>{option.range}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-        {errors.segment && <p id="segment-error" className="field-error">{errors.segment}</p>}
-      </fieldset>
 
       {isDirty && (
         <p className="draft-notice" role="status">

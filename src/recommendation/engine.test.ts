@@ -33,12 +33,13 @@ function creator(
 }
 
 function query(
-  budgetKrw: number,
+  budgetKrw: number | null,
   categories: Category[] = ["게임"],
-  segment: FollowerSegment = "nano",
+  segment: FollowerSegment | null = "nano",
   goal: CampaignGoal = "balanced",
+  desiredCreatorCount = 5,
 ) {
-  return { budgetKrw, categories, segment, goal } as const;
+  return { budgetKrw, categories, segment, goal, desiredCreatorCount } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -53,6 +54,50 @@ describe("getFollowerSegment", () => {
 });
 
 describe("recommendCreators", () => {
+  it("필터를 모두 비우면 전체 후보에서 기본 인원만 추천한다", () => {
+    const candidates = Array.from({ length: 8 }, (_, index) =>
+      creator(`C${index + 1}`, {
+        category: index % 2 === 0 ? "게임" : "교육",
+        followers: index % 3 === 0 ? 20_000 : 8_000,
+        segment: index % 3 === 0 ? "micro" : "nano",
+      }),
+    );
+
+    const result = recommendCreators(
+      candidates,
+      query(null, [], null, "balanced", 5),
+    );
+
+    expect(result.outcome).toBe("exact");
+    expect(result.sections.flatMap(({ items }) => items)).toHaveLength(5);
+    expect(result.appliedQuery).toMatchObject({
+      budgetKrw: null,
+      categories: [],
+      segment: null,
+      desiredCreatorCount: 5,
+    });
+  });
+
+  it("추천 인원은 우선순위가 높은 섹션부터 전체 합계로 제한한다", () => {
+    const result = recommendCreators(
+      [
+        creator("KNOWN-1"),
+        creator("KNOWN-2"),
+        creator("NEW", {
+          totalCampaignCount: 0,
+          totalCampaignBudgetKrw: 0,
+          avgCampaignBudgetKrw: null,
+          advertiserRating: null,
+        }),
+      ],
+      query(300_000, ["게임"], "nano", "balanced", 2),
+    );
+
+    expect(result.sections).toHaveLength(1);
+    expect(result.sections[0].tier).toBe("exact");
+    expect(result.sections[0].items).toHaveLength(2);
+  });
+
   it("캠페인 목적에 따라 가중치와 추천 순위가 달라진다", () => {
     const candidates = [
       creator("REACH", {

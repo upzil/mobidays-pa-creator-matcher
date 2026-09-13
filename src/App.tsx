@@ -20,22 +20,21 @@ const initialDraft: CampaignDraft = {
   budget: "",
   categories: [],
   segment: "",
-  goal: "",
+  goal: "balanced",
+  desiredCreatorCount: "5",
 };
 
 function validateDraft(draft: CampaignDraft): FormErrors {
   const errors: FormErrors = {};
-  if (!draft.goal) {
-    errors.goal = "캠페인 목적을 선택해 주세요.";
-  }
-  if (!/^\d+$/.test(draft.budget) || Number(draft.budget) <= 0) {
+  if (draft.budget !== "" && (!/^\d+$/.test(draft.budget) || Number(draft.budget) <= 0)) {
     errors.budget = "1원 이상의 1인당 최대 예산을 입력해 주세요.";
   }
-  if (draft.categories.length === 0) {
-    errors.categories = "캠페인과 관련된 카테고리를 하나 이상 선택해 주세요.";
-  }
-  if (!draft.segment) {
-    errors.segment = "원하는 크리에이터 규모를 선택해 주세요.";
+  if (
+    !/^\d+$/.test(draft.desiredCreatorCount) ||
+    Number(draft.desiredCreatorCount) < 1 ||
+    Number(draft.desiredCreatorCount) > 20
+  ) {
+    errors.desiredCreatorCount = "추천 인원은 1명에서 20명 사이로 입력해 주세요.";
   }
   return errors;
 }
@@ -43,9 +42,10 @@ function validateDraft(draft: CampaignDraft): FormErrors {
 function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | null) {
   if (!query) return false;
   return (
-    Number(draft.budget) === query.budgetKrw &&
-    draft.segment === query.segment &&
+    (draft.budget === "" ? null : Number(draft.budget)) === query.budgetKrw &&
+    (draft.segment || null) === query.segment &&
     draft.goal === query.goal &&
+    Number(draft.desiredCreatorCount) === query.desiredCreatorCount &&
     draft.categories.length === query.categories.length &&
     draft.categories.every((category) => query.categories.includes(category))
   );
@@ -64,9 +64,10 @@ function App() {
   const [announcement, setAnnouncement] = useState("크리에이터 데이터를 불러오는 중입니다.");
   const [reloadToken, setReloadToken] = useState(0);
   const budgetRef = useRef<HTMLInputElement>(null);
-  const goalRef = useRef<HTMLInputElement>(null);
-  const categoryRef = useRef<HTMLInputElement>(null);
-  const segmentRef = useRef<HTMLInputElement>(null);
+  const desiredCreatorCountRef = useRef<HTMLInputElement>(null);
+  const goalRef = useRef<HTMLSelectElement>(null);
+  const categoryRef = useRef<HTMLElement>(null);
+  const segmentRef = useRef<HTMLSelectElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -123,21 +124,20 @@ function App() {
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      if (nextErrors.goal) goalRef.current?.focus();
+      if (nextErrors.desiredCreatorCount) desiredCreatorCountRef.current?.focus();
       else if (nextErrors.budget) budgetRef.current?.focus();
-      else if (nextErrors.categories) categoryRef.current?.focus();
-      else segmentRef.current?.focus();
       setAnnouncement("입력한 조건을 확인해 주세요.");
       return;
     }
 
-    if (loadState !== "ready" || !draft.segment || !draft.goal) return;
+    if (loadState !== "ready") return;
 
     const query: RecommendationQuery = {
-      budgetKrw: Number(draft.budget),
+      budgetKrw: draft.budget === "" ? null : Number(draft.budget),
       categories: draft.categories,
-      segment: draft.segment,
+      segment: draft.segment || null,
       goal: draft.goal,
+      desiredCreatorCount: Number(draft.desiredCreatorCount),
     };
     const nextResult = recommendCreators(creators, query);
     setResult(nextResult);
@@ -202,6 +202,7 @@ function App() {
             isDirty={isDirty}
             disabled={loadState !== "ready"}
             budgetRef={budgetRef}
+            desiredCreatorCountRef={desiredCreatorCountRef}
             goalRef={goalRef}
             categoryRef={categoryRef}
             segmentRef={segmentRef}
@@ -209,9 +210,12 @@ function App() {
               setDraft((current) => ({ ...current, budget }));
               clearError("budget");
             }}
+            onDesiredCreatorCountChange={(desiredCreatorCount) => {
+              setDraft((current) => ({ ...current, desiredCreatorCount }));
+              clearError("desiredCreatorCount");
+            }}
             onGoalChange={(goal: CampaignGoal) => {
               setDraft((current) => ({ ...current, goal }));
-              clearError("goal");
             }}
             onCategoryChange={(category: Category, checked) => {
               setDraft((current) => ({
@@ -220,11 +224,9 @@ function App() {
                   ? [...current.categories, category]
                   : current.categories.filter((item) => item !== category),
               }));
-              clearError("categories");
             }}
-            onSegmentChange={(segment: FollowerSegment) => {
+            onSegmentChange={(segment: FollowerSegment | "") => {
               setDraft((current) => ({ ...current, segment }));
-              clearError("segment");
             }}
             onSubmit={handleSubmit}
           />

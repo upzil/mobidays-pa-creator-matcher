@@ -93,7 +93,7 @@ function buildScoreContext(
 
 function makeBreakdown(
   creator: Creator,
-  budgetKrw: number,
+  budgetKrw: number | null,
   context: ScoreContext,
   goal: CampaignGoal,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
@@ -126,7 +126,7 @@ function makeBreakdown(
       ? 0.5
       : (context.ratingPercentiles.get(creator.creatorId) ?? 0.5);
   const budgetEfficiency =
-    creator.avgCampaignBudgetKrw === null
+    budgetKrw === null || creator.avgCampaignBudgetKrw === null
       ? 0.5
       : budgetKrw / (budgetKrw + creator.avgCampaignBudgetKrw);
 
@@ -229,19 +229,25 @@ function makeReasons(
   tier: MatchTier,
   breakdown: ScoreBreakdown,
   budgetOverageRate: number | null,
+  hasCategoryFilter: boolean,
+  hasBudgetFilter: boolean,
 ): RecommendationReason[] {
-  const reasons: RecommendationReason[] = [
-    {
+  const reasons: RecommendationReason[] = [];
+
+  if (hasCategoryFilter) {
+    reasons.push({
       code: "category-match",
       message: `선택한 ${creator.category} 카테고리와 일치해요.`,
-    },
-  ];
+    });
+  }
 
   if (tier === "exact") {
-    reasons.push({
-      code: "within-budget",
-      message: "평균 협업비가 입력 예산 안에 들어와요.",
-    });
+    if (hasBudgetFilter) {
+      reasons.push({
+        code: "within-budget",
+        message: "평균 협업비가 입력 예산 안에 들어와요.",
+      });
+    }
   } else if (tier === "exploration") {
     reasons.push({
       code: "missing-history",
@@ -261,6 +267,12 @@ function makeReasons(
 
   const performance = performanceReason(creator, breakdown);
   if (performance) reasons.push(performance);
+  if (reasons.length === 0) {
+    reasons.push({
+      code: "goal-fit",
+      message: "선택한 캠페인 목적의 성과 지표를 종합한 추천이에요.",
+    });
+  }
 
   // Keep the explanation payload compact and derived from the score or selected tier.
   return reasons.slice(0, 3);
@@ -269,10 +281,11 @@ function makeReasons(
 function scoreCreator(
   creator: Creator,
   tier: MatchTier,
-  budgetKrw: number,
+  budgetKrw: number | null,
   context: ScoreContext,
-  requestedSegment: FollowerSegment,
+  requestedSegment: FollowerSegment | null,
   goal: CampaignGoal,
+  hasCategoryFilter: boolean,
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
@@ -285,7 +298,7 @@ function scoreCreator(
     0,
   );
   const budgetOverageRate =
-    creator.avgCampaignBudgetKrw === null
+    budgetKrw === null || creator.avgCampaignBudgetKrw === null
       ? null
       : Math.max(0, creator.avgCampaignBudgetKrw / budgetKrw - 1);
   const warnings: string[] = [];
@@ -300,7 +313,7 @@ function scoreCreator(
       `평균 협업비가 입력 예산보다 ${(budgetOverageRate * 100).toFixed(1)}% 높아요.`,
     );
   }
-  if (tier === "segment-relaxed") {
+  if (tier === "segment-relaxed" && requestedSegment !== null) {
     warnings.push(
       `요청한 ${SEGMENT_LABELS[requestedSegment]} 규모 대신 ${SEGMENT_LABELS[creator.segment]} 규모를 제안해요.`,
     );
@@ -318,6 +331,8 @@ function scoreCreator(
       tier,
       breakdown,
       budgetOverageRate,
+      hasCategoryFilter,
+      budgetKrw !== null,
     ),
     warnings,
     budgetOverageRate,
@@ -378,17 +393,27 @@ function adjacentSegments(segment: FollowerSegment): FollowerSegment[] {
 }
 
 function assertQuery(query: RecommendationQuery): void {
-  if (!Number.isSafeInteger(query.budgetKrw) || query.budgetKrw <= 0) {
-    throw new RangeError("budgetKrw는 0보다 큰 안전한 정수여야 합니다.");
+  if (
+    query.budgetKrw !== null &&
+    (!Number.isSafeInteger(query.budgetKrw) || query.budgetKrw <= 0)
+  ) {
+    throw new RangeError("budgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
   }
-  if (query.categories.length === 0) {
-    throw new RangeError("하나 이상의 카테고리를 선택해야 합니다.");
-  }
-  if (!["nano", "micro", "macro"].includes(query.segment)) {
+  if (
+    query.segment !== null &&
+    !["nano", "micro", "macro"].includes(query.segment)
+  ) {
     throw new RangeError("지원하지 않는 팔로워 규모입니다.");
   }
   if (!CAMPAIGN_GOALS.includes(query.goal)) {
     throw new RangeError("지원하지 않는 캠페인 목적입니다.");
+  }
+  if (
+    !Number.isSafeInteger(query.desiredCreatorCount) ||
+    query.desiredCreatorCount < 1 ||
+    query.desiredCreatorCount > 20
+  ) {
+    throw new RangeError("desiredCreatorCount는 1 이상 20 이하의 안전한 정수여야 합니다.");
   }
 }
 
@@ -402,10 +427,15 @@ export function recommendCreators(
     categories: [...query.categories],
     segment: query.segment,
     goal: query.goal,
+    desiredCreatorCount: query.desiredCreatorCount,
   };
   const categories = new Set(query.categories);
-  const relevant = creators.filter((creator) => categories.has(creator.category));
-  const sameSegment = relevant.filter((creator) => creator.segment === query.segment);
+  const relevant = query.categories.length === 0
+    ? [...creators]
+    : creators.filter((creator) => categories.has(creator.category));
+  const sameSegment = query.segment === null
+    ? relevant
+    : relevant.filter((creator) => creator.segment === query.segment);
   const knownRatings = creators.flatMap((creator) =>
     creator.advertiserRating === null ? [] : [creator.advertiserRating],
   );
@@ -429,6 +459,7 @@ export function recommendCreators(
       contextFor(creator.segment),
       query.segment,
       query.goal,
+      query.categories.length > 0,
     );
   const makeSection = (
     tier: MatchTier,
@@ -443,42 +474,58 @@ export function recommendCreators(
     ),
   });
 
+  const limitSections = (
+    sections: readonly RecommendationSection[],
+  ): RecommendationSection[] => {
+    let remaining = query.desiredCreatorCount;
+    return sections.flatMap((section) => {
+      if (remaining === 0) return [];
+      const items = section.items.slice(0, remaining);
+      remaining -= items.length;
+      return items.length > 0 ? [{ ...section, items }] : [];
+    });
+  };
+
   const exact = sameSegment.filter(
     (creator) =>
-      creator.avgCampaignBudgetKrw !== null &&
-      creator.avgCampaignBudgetKrw <= query.budgetKrw,
+      query.budgetKrw === null ||
+      (creator.avgCampaignBudgetKrw !== null &&
+        creator.avgCampaignBudgetKrw <= query.budgetKrw),
   );
   const exploration = sameSegment.filter(
-    (creator) => creator.avgCampaignBudgetKrw === null,
+    (creator) => query.budgetKrw !== null && creator.avgCampaignBudgetKrw === null,
   );
 
   if (exact.length > 0) {
-    const sections = [makeSection("exact", exact, query.segment)];
+    const sections = [makeSection("exact", exact, query.segment ?? undefined)];
     if (exploration.length > 0) {
-      sections.push(makeSection("exploration", exploration, query.segment));
+      sections.push(makeSection("exploration", exploration, query.segment ?? undefined));
     }
     return {
       appliedQuery,
       outcome: "exact",
-      sections,
+      sections: limitSections(sections),
       attemptedRelaxations: [],
       diagnostics: [],
     };
   }
 
-  const budgetRelaxed = sameSegment.filter((creator) => {
+  const budgetKrw = query.budgetKrw;
+  const budgetRelaxed = budgetKrw === null ? [] : sameSegment.filter((creator) => {
     const cost = creator.avgCampaignBudgetKrw;
     return (
       cost !== null &&
-      cost > query.budgetKrw &&
-      cost * 5 <= query.budgetKrw * 6
+      cost > budgetKrw &&
+      cost * 5 <= budgetKrw * 6
     );
   });
   if (budgetRelaxed.length > 0) {
     return {
       appliedQuery,
       outcome: "budget-relaxed",
-      sections: [makeSection("budget-relaxed", budgetRelaxed, query.segment)],
+      sections: limitSections([
+        makeSection("budget-relaxed", budgetRelaxed, query.segment ?? undefined),
+      ]),
       attemptedRelaxations: ["budget-20-percent"],
       diagnostics: [
         "정확히 일치하는 후보가 없어 같은 카테고리와 규모에서 예산을 최대 20%까지 완화했어요.",
@@ -486,13 +533,14 @@ export function recommendCreators(
     };
   }
 
-  const adjacent = adjacentSegments(query.segment);
+  const adjacent = query.segment === null ? [] : adjacentSegments(query.segment);
   const segmentSections = adjacent.flatMap((segment) => {
     const candidates = relevant.filter(
       (creator) =>
         creator.segment === segment &&
+        budgetKrw !== null &&
         creator.avgCampaignBudgetKrw !== null &&
-        creator.avgCampaignBudgetKrw <= query.budgetKrw,
+        creator.avgCampaignBudgetKrw <= budgetKrw,
     );
     return candidates.length > 0
       ? [makeSection("segment-relaxed", candidates, segment)]
@@ -502,7 +550,7 @@ export function recommendCreators(
     return {
       appliedQuery,
       outcome: "segment-relaxed",
-      sections: segmentSections,
+      sections: limitSections(segmentSections),
       attemptedRelaxations: ["budget-20-percent", "adjacent-segment"],
       diagnostics: [
         "정확한 예산·규모 후보가 없어 같은 카테고리의 인접 규모 대안을 보여드려요.",
@@ -514,7 +562,9 @@ export function recommendCreators(
     return {
       appliedQuery,
       outcome: "exploration",
-      sections: [makeSection("exploration", exploration, query.segment)],
+      sections: limitSections([
+        makeSection("exploration", exploration, query.segment ?? undefined),
+      ]),
       attemptedRelaxations: [
         "budget-20-percent",
         "adjacent-segment",
