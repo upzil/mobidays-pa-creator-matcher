@@ -394,6 +394,13 @@ a:focus-visible {
   gap: 28px;
 }
 
+.result-section + .directory-content,
+.empty-state + .directory-content {
+  margin-top: 64px;
+  padding-top: 48px;
+  border-top: 1px solid var(--ink);
+}
+
 .directory-heading > div {
   min-width: 0;
 }

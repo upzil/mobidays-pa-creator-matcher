@@ -39,6 +39,20 @@ const creators: Creator[] = [
     avgCampaignBudgetKrw: null,
     advertiserRating: null,
   },
+  {
+    creatorId: "C3",
+    creatorName: "교육채널",
+    category: "교육",
+    platform: "유튜브",
+    followers: 9_000,
+    segment: "nano",
+    avgViewCount: 1_000,
+    engagementRate: 6.5,
+    totalCampaignCount: 5,
+    totalCampaignBudgetKrw: 1_000_000,
+    avgCampaignBudgetKrw: 200_000,
+    advertiserRating: 4.2,
+  },
 ];
 
 describe("App", () => {
@@ -51,9 +65,10 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("status")).toHaveTextContent("데이터를 확인");
-    expect(await screen.findByRole("heading", { name: "전체 크리에이터 2명" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터 3명" })).toBeInTheDocument();
     expect(screen.getByLabelText("전체 목록 정렬")).toHaveValue("followers");
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
+      "교육채널",
       "게임채널",
       "새로운채널",
     ]);
@@ -65,20 +80,21 @@ describe("App", () => {
   it("추천 전 전체 목록을 기본 지표로 재정렬한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.selectOptions(screen.getByLabelText("전체 목록 정렬"), "views");
 
     expect(screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual([
       "새로운채널",
       "게임채널",
+      "교육채널",
     ]);
   });
 
   it("빈 제출 시 필드 오류를 표시하고 첫 오류로 초점을 옮긴다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
@@ -91,7 +107,7 @@ describe("App", () => {
   it("유효 조건으로 정확 추천과 별도 탐색 후보를 표시한다", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByRole("heading", { name: "전체 크리에이터 2명" });
+    await screen.findByRole("heading", { name: "전체 크리에이터 3명" });
 
     await user.type(screen.getByLabelText("1인당 최대 예산"), "300000");
     await user.click(screen.getByRole("checkbox", { name: "게임" }));
@@ -102,6 +118,8 @@ describe("App", () => {
     expect(screen.getByText("새로운채널")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /조건에 맞는 추천/ })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /함께 살펴볼 탐색 후보/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "그 외 크리에이터 1명" })).toBeInTheDocument();
+    expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("1인당 최대 예산"), "0");
@@ -120,6 +138,6 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "다시 불러오기" }));
 
     await waitFor(() => expect(loadCreators).toHaveBeenCalledTimes(2));
-    expect(await screen.findByRole("heading", { name: "전체 크리에이터 2명" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "전체 크리에이터 3명" })).toBeInTheDocument();
   });
 });

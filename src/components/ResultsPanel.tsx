@@ -87,6 +87,12 @@ export function ResultsPanel({
   }
 
   const itemCount = sections.reduce((count, section) => count + section.items.length, 0);
+  const recommendedIds = new Set(
+    sections.flatMap((section) => section.items.map((item) => item.creator.creatorId)),
+  );
+  const remainingCreators = creators.filter(
+    (creator) => !recommendedIds.has(creator.creatorId),
+  );
 
   return (
     <div className="results-content">
@@ -146,18 +152,40 @@ export function ResultsPanel({
               </div>
             </section>
           )})}
+
+          {remainingCreators.length > 0 && (
+            <CreatorDirectory
+              creators={remainingCreators}
+              excludedRows={0}
+              sortMode={browseSortMode}
+              onSortChange={onBrowseSortChange}
+              eyebrow="OTHER CREATORS"
+              heading={`그 외 크리에이터 ${remainingCreators.length}명`}
+              description="추천 후보를 상단에 배치했어요. 나머지 전체 목록도 기본 지표로 계속 비교할 수 있어요."
+            />
+          )}
         </>
       ) : (
-        <section className="empty-state" aria-labelledby="empty-title">
-          <p className="eyebrow">NO AVAILABLE MATCH</p>
-          <h3 id="empty-title">카테고리를 유지한 대안도 찾지 못했어요.</h3>
-          <p>{result.diagnostics[0] ?? "예산을 높이거나 크리에이터 규모 또는 카테고리를 바꿔 다시 찾아보세요."}</p>
-          <div className="recovery-actions" aria-label="조건 수정 바로가기">
-            <button type="button" onClick={onFocusBudget}>예산 조정하기</button>
-            <button type="button" onClick={onFocusSegment}>규모 바꾸기</button>
-            <button type="button" onClick={onFocusCategories}>카테고리 수정하기</button>
-          </div>
-        </section>
+        <>
+          <section className="empty-state" aria-labelledby="empty-title">
+            <p className="eyebrow">NO AVAILABLE MATCH</p>
+            <h3 id="empty-title">카테고리를 유지한 대안도 찾지 못했어요.</h3>
+            <p>{result.diagnostics[0] ?? "예산을 높이거나 크리에이터 규모 또는 카테고리를 바꿔 다시 찾아보세요."}</p>
+            <div className="recovery-actions" aria-label="조건 수정 바로가기">
+              <button type="button" onClick={onFocusBudget}>예산 조정하기</button>
+              <button type="button" onClick={onFocusSegment}>규모 바꾸기</button>
+              <button type="button" onClick={onFocusCategories}>카테고리 수정하기</button>
+            </div>
+          </section>
+          <CreatorDirectory
+            creators={creators}
+            excludedRows={0}
+            sortMode={browseSortMode}
+            onSortChange={onBrowseSortChange}
+            heading={`전체 크리에이터 ${creators.length}명`}
+            description="조건에 맞는 추천 후보는 없지만 전체 목록은 계속 탐색할 수 있어요."
+          />
+        </>
       )}
     </div>
   );

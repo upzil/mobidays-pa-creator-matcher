@@ -26,6 +26,9 @@ interface CreatorDirectoryProps {
   excludedRows: number;
   sortMode: BrowseSortMode;
   onSortChange: (mode: BrowseSortMode) => void;
+  eyebrow?: string;
+  heading?: string;
+  description?: string;
 }
 
 function displayBudget(creator: Creator) {
@@ -39,14 +42,17 @@ export function CreatorDirectory({
   excludedRows,
   sortMode,
   onSortChange,
+  eyebrow = "ALL CREATORS",
+  heading = `전체 크리에이터 ${creators.length}명`,
+  description = "추천 조건을 입력하기 전에도 주요 지표를 비교할 수 있어요.",
 }: CreatorDirectoryProps) {
   return (
     <div className="directory-content">
       <header className="directory-heading">
         <div>
-          <p className="eyebrow">ALL CREATORS</p>
-          <h2>전체 크리에이터 {creators.length}명</h2>
-          <p>추천 조건을 입력하기 전에도 주요 지표를 비교할 수 있어요.</p>
+          <p className="eyebrow">{eyebrow}</p>
+          <h2>{heading}</h2>
+          <p>{description}</p>
         </div>
         <label htmlFor="sort-directory">
           <span>전체 목록 정렬</span>
