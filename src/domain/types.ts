@@ -16,6 +16,7 @@ export const PLATFORMS = ["유튜브", "인스타그램"] as const;
 export type Category = (typeof CATEGORIES)[number];
 export type Platform = (typeof PLATFORMS)[number];
 export type FollowerSegment = "nano" | "micro" | "macro";
+export type BudgetMode = "total" | "perCreator";
 export type MatchTier =
   | "exact"
   | "exploration"
@@ -75,6 +76,7 @@ export interface ParsedCreators {
 
 export interface RecommendationQuery {
   totalBudgetKrw: number | null;
+  perCreatorBudgetKrw: number | null;
   categories: readonly Category[];
   platform: Platform | null;
   segment: FollowerSegment | null;

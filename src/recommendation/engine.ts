@@ -110,7 +110,7 @@ function buildScoreContext(
 
 function makeBreakdown(
   creator: Creator,
-  totalBudgetKrw: number | null,
+  budgetConstraintKrw: number | null,
   context: ScoreContext,
   goalPosition: number,
 ): { breakdown: ScoreBreakdown; adjustedRating: number | null } {
@@ -143,7 +143,7 @@ function makeBreakdown(
       ? 0.5
       : (context.ratingPercentiles.get(creator.creatorId) ?? 0.5);
   const budgetEfficiency =
-    totalBudgetKrw === null || creator.avgCampaignBudgetKrw === null
+    budgetConstraintKrw === null || creator.avgCampaignBudgetKrw === null
       ? 0.5
       : 1 - (context.budgetPercentiles.get(creator.creatorId) ?? 0.5);
 
@@ -246,7 +246,6 @@ function makeReasons(
   tier: MatchTier,
   breakdown: ScoreBreakdown,
   hasCategoryFilter: boolean,
-  hasBudgetFilter: boolean,
 ): RecommendationReason[] {
   const reasons: RecommendationReason[] = [];
 
@@ -257,19 +256,12 @@ function makeReasons(
     });
   }
 
-  if (tier === "exact") {
-    if (hasBudgetFilter) {
-      reasons.push({
-        code: "within-budget",
-        message: "선택된 조합의 예상 협업비 합계가 총예산 안에 들어와요.",
-      });
-    }
-  } else if (tier === "exploration") {
+  if (tier === "exploration") {
     reasons.push({
       code: "missing-history",
       message: "신규 탐색 후보로 협업비와 만족도 확인이 필요해요.",
     });
-  } else {
+  } else if (tier === "segment-relaxed") {
     reasons.push({
       code: "segment-relaxed",
       message: `요청 규모와 인접한 ${SEGMENT_LABELS[creator.segment]} 크리에이터예요.`,
@@ -292,7 +284,7 @@ function makeReasons(
 function scoreCreator(
   creator: Creator,
   tier: MatchTier,
-  totalBudgetKrw: number | null,
+  budgetConstraintKrw: number | null,
   context: ScoreContext,
   requestedSegment: FollowerSegment | null,
   goalPosition: number,
@@ -300,7 +292,7 @@ function scoreCreator(
 ): RecommendedCreator {
   const { breakdown, adjustedRating } = makeBreakdown(
     creator,
-    totalBudgetKrw,
+    budgetConstraintKrw,
     context,
     goalPosition,
   );
@@ -333,7 +325,6 @@ function scoreCreator(
       tier,
       breakdown,
       hasCategoryFilter,
-      totalBudgetKrw !== null,
     ),
     warnings,
   };
@@ -515,6 +506,15 @@ function assertQuery(query: RecommendationQuery): void {
     throw new RangeError("totalBudgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
   }
   if (
+    query.perCreatorBudgetKrw !== null &&
+    (!Number.isSafeInteger(query.perCreatorBudgetKrw) || query.perCreatorBudgetKrw <= 0)
+  ) {
+    throw new RangeError("perCreatorBudgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
+  }
+  if (query.totalBudgetKrw !== null && query.perCreatorBudgetKrw !== null) {
+    throw new RangeError("총예산과 1인당 예산은 동시에 적용할 수 없습니다.");
+  }
+  if (
     query.platform !== null &&
     !["유튜브", "인스타그램"].includes(query.platform)
   ) {
@@ -541,8 +541,12 @@ function assertQuery(query: RecommendationQuery): void {
   ) {
     throw new RangeError("desiredCreatorCount는 null이거나 1 이상 20 이하의 안전한 정수여야 합니다.");
   }
-  if (query.totalBudgetKrw === null && query.desiredCreatorCount === null) {
-    throw new RangeError("totalBudgetKrw와 desiredCreatorCount 중 하나는 필수입니다.");
+  if (
+    query.totalBudgetKrw === null &&
+    query.perCreatorBudgetKrw === null &&
+    query.desiredCreatorCount === null
+  ) {
+    throw new RangeError("예산 또는 desiredCreatorCount 중 하나는 필수입니다.");
   }
 }
 
@@ -553,6 +557,7 @@ export function recommendCreators(
   assertQuery(query);
   const appliedQuery: RecommendationQuery = {
     totalBudgetKrw: query.totalBudgetKrw,
+    perCreatorBudgetKrw: query.perCreatorBudgetKrw,
     categories: [...query.categories],
     platform: query.platform,
     segment: query.segment,
@@ -576,6 +581,13 @@ export function recommendCreators(
     knownRatings.length === 0
       ? 3
       : knownRatings.reduce((sum, rating) => sum + rating, 0) / knownRatings.length;
+  const budgetConstraintKrw = query.totalBudgetKrw ?? query.perCreatorBudgetKrw;
+  const matchesBudgetConstraint = (creator: Creator) => {
+    if (budgetConstraintKrw === null) return true;
+    if (creator.avgCampaignBudgetKrw === null) return false;
+    return query.perCreatorBudgetKrw === null ||
+      creator.avgCampaignBudgetKrw <= query.perCreatorBudgetKrw;
+  };
   const contexts = new Map<FollowerSegment, ScoreContext>();
   const contextFor = (segment: FollowerSegment): ScoreContext => {
     const existing = contexts.get(segment);
@@ -588,7 +600,7 @@ export function recommendCreators(
     scoreCreator(
       creator,
       tier,
-      query.totalBudgetKrw,
+      budgetConstraintKrw,
       contextFor(creator.segment),
       query.segment,
       query.goalPosition,
@@ -603,9 +615,7 @@ export function recommendCreators(
     ...(segment ? { segment } : {}),
     items: sortRecommendations(items, "recommended"),
   });
-  const exactPool = query.totalBudgetKrw === null
-    ? sameSegment
-    : sameSegment.filter((creator) => creator.avgCampaignBudgetKrw !== null);
+  const exactPool = sameSegment.filter(matchesBudgetConstraint);
   const exact = selectOptimalCombination(
     exactPool.map((creator) => score(creator, "exact")),
     query.totalBudgetKrw,
@@ -626,7 +636,7 @@ export function recommendCreators(
   const adjacentPool = relevant.filter(
     (creator) =>
       adjacent.includes(creator.segment) &&
-      (query.totalBudgetKrw === null || creator.avgCampaignBudgetKrw !== null),
+      matchesBudgetConstraint(creator),
   );
   const segmentSelection = selectOptimalCombination(
     adjacentPool.map((creator) => score(creator, "segment-relaxed")),
@@ -644,7 +654,7 @@ export function recommendCreators(
       sections: segmentSections,
       attemptedRelaxations: ["adjacent-segment"],
       diagnostics: [
-        "요청한 규모에서 총예산을 지키는 조합이 없어 같은 카테고리의 인접 규모 대안을 보여드려요.",
+        "요청한 규모에서 입력한 조건을 충족하는 후보가 없어 같은 카테고리의 인접 규모 대안을 보여드려요.",
       ],
     };
   }
@@ -655,7 +665,7 @@ export function recommendCreators(
     sections: [],
     attemptedRelaxations: ["adjacent-segment"],
     diagnostics: [
-      "선택한 플랫폼·카테고리·규모에서 비용이 확인되고 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 플랫폼, 규모 또는 카테고리를 변경해 주세요.",
+      "선택한 플랫폼·카테고리·규모에서 입력한 인원·예산 조건을 충족하는 후보를 찾지 못했어요. 예산을 높이거나 추천 인원, 플랫폼, 규모 또는 카테고리를 변경해 주세요.",
     ],
   };
 }

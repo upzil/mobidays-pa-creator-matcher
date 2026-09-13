@@ -3,6 +3,7 @@ import { CampaignForm, type CampaignDraft, type FormErrors } from "./components/
 import { ResultsPanel } from "./components/ResultsPanel";
 import { loadCreators } from "./data/creatorCsv";
 import type {
+  BudgetMode,
   BrowseSortMode,
   Category,
   Creator,
@@ -17,6 +18,7 @@ import { recommendCreators, sortRecommendations } from "./recommendation/engine"
 import "./styles.css";
 
 const initialDraft: CampaignDraft = {
+  budgetMode: "total",
   budgetManwon: "",
   categories: [],
   platform: "",
@@ -27,14 +29,14 @@ const initialDraft: CampaignDraft = {
 
 function validateDraft(draft: CampaignDraft): FormErrors {
   const errors: FormErrors = {};
-  const totalBudgetKrw = Number(draft.budgetManwon) * 10_000;
+  const budgetKrw = Number(draft.budgetManwon) * 10_000;
   if (
     draft.budgetManwon !== "" &&
     (!/^\d+$/.test(draft.budgetManwon) ||
       Number(draft.budgetManwon) <= 0 ||
-      !Number.isSafeInteger(totalBudgetKrw))
+      !Number.isSafeInteger(budgetKrw))
   ) {
-    errors.budget = "1만원 이상의 총 예산을 입력해 주세요.";
+    errors.budget = "1만원 이상의 예산을 입력해 주세요.";
   }
   if (
     draft.desiredCreatorCount !== "" &&
@@ -45,15 +47,19 @@ function validateDraft(draft: CampaignDraft): FormErrors {
     errors.desiredCreatorCount = "추천 인원은 1명에서 20명 사이로 입력해 주세요.";
   }
   if (draft.budgetManwon === "" && draft.desiredCreatorCount === "") {
-    errors.countOrBudget = "추천 인원 또는 총예산 중 하나를 입력해 주세요.";
+    errors.countOrBudget = "추천 인원 또는 예산 중 하나를 입력해 주세요.";
   }
   return errors;
 }
 
 function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | null) {
   if (!query) return false;
+  const budgetKrw = draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000;
+  const totalBudgetKrw = draft.budgetMode === "total" ? budgetKrw : null;
+  const perCreatorBudgetKrw = draft.budgetMode === "perCreator" ? budgetKrw : null;
   return (
-    (draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000) === query.totalBudgetKrw &&
+    totalBudgetKrw === query.totalBudgetKrw &&
+    perCreatorBudgetKrw === query.perCreatorBudgetKrw &&
     (draft.platform || null) === query.platform &&
     (draft.segment || null) === query.segment &&
     draft.goalPosition === query.goalPosition &&
@@ -146,7 +152,14 @@ function App() {
     if (loadState !== "ready") return;
 
     const query: RecommendationQuery = {
-      totalBudgetKrw: draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000,
+      totalBudgetKrw:
+        draft.budgetMode === "total" && draft.budgetManwon !== ""
+          ? Number(draft.budgetManwon) * 10_000
+          : null,
+      perCreatorBudgetKrw:
+        draft.budgetMode === "perCreator" && draft.budgetManwon !== ""
+          ? Number(draft.budgetManwon) * 10_000
+          : null,
       categories: draft.categories,
       platform: draft.platform || null,
       segment: draft.segment || null,
@@ -223,6 +236,15 @@ function App() {
             segmentRef={segmentRef}
             onBudgetChange={(budgetManwon) => {
               setDraft((current) => ({ ...current, budgetManwon }));
+              clearError("budget");
+              clearError("countOrBudget");
+            }}
+            onBudgetModeChange={(budgetMode: BudgetMode) => {
+              setDraft((current) => ({
+                ...current,
+                budgetMode,
+                budgetManwon: current.budgetMode === budgetMode ? current.budgetManwon : "",
+              }));
               clearError("budget");
               clearError("countOrBudget");
             }}

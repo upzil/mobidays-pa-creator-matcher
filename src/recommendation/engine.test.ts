@@ -39,8 +39,17 @@ function query(
   goalPosition = 50,
   desiredCreatorCount: number | null = null,
   platform: Platform | null = null,
+  perCreatorBudgetKrw: number | null = null,
 ) {
-  return { totalBudgetKrw, categories, platform, segment, goalPosition, desiredCreatorCount } as const;
+  return {
+    totalBudgetKrw,
+    perCreatorBudgetKrw,
+    categories,
+    platform,
+    segment,
+    goalPosition,
+    desiredCreatorCount,
+  } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -73,6 +82,7 @@ describe("recommendCreators", () => {
     expect(result.sections.flatMap(({ items }) => items)).toHaveLength(8);
     expect(result.appliedQuery).toMatchObject({
       totalBudgetKrw: 10_000_000,
+      perCreatorBudgetKrw: null,
       categories: [],
       segment: null,
       desiredCreatorCount: null,
@@ -159,6 +169,52 @@ describe("recommendCreators", () => {
     expect(result.sections[0].items.map(({ creator }) => creator.creatorId).sort()).toEqual([
       "VALUE-1",
       "VALUE-2",
+    ]);
+  });
+
+  it("1인당 예산 이하의 비용 확인 가능 후보만 추천한다", () => {
+    const result = recommendCreators(
+      [
+        creator("OVER", { avgCampaignBudgetKrw: 500_000, engagementRate: 12 }),
+        creator("IN-1", { avgCampaignBudgetKrw: 300_000, engagementRate: 9 }),
+        creator("IN-2", { avgCampaignBudgetKrw: 200_000, avgViewCount: 4_000 }),
+        creator("UNKNOWN", {
+          totalCampaignCount: 0,
+          totalCampaignBudgetKrw: 0,
+          avgCampaignBudgetKrw: null,
+          advertiserRating: null,
+        }),
+      ],
+      query(null, ["게임"], "nano", 50, 2, null, 300_000),
+    );
+
+    expect(result.outcome).toBe("exact");
+    expect(result.appliedQuery.perCreatorBudgetKrw).toBe(300_000);
+    expect(result.sections[0].items.map(({ creator }) => creator.creatorId).sort()).toEqual([
+      "IN-1",
+      "IN-2",
+    ]);
+    expect(result.sections[0].items.flatMap(({ reasons }) => reasons)).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "segment-relaxed" })]),
+    );
+    expect(result.sections[0].items.flatMap(({ reasons }) => reasons)).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "within-budget" })]),
+    );
+  });
+
+  it("추천 인원이 없으면 1인당 예산 이하의 모든 후보를 추천한다", () => {
+    const result = recommendCreators(
+      [
+        creator("IN-1", { avgCampaignBudgetKrw: 300_000 }),
+        creator("IN-2", { avgCampaignBudgetKrw: 200_000 }),
+        creator("OVER", { avgCampaignBudgetKrw: 300_001 }),
+      ],
+      query(null, ["게임"], "nano", 50, null, null, 300_000),
+    );
+
+    expect(result.sections[0].items.map(({ creator }) => creator.creatorId).sort()).toEqual([
+      "IN-1",
+      "IN-2",
     ]);
   });
 
@@ -301,10 +357,17 @@ describe("recommendCreators", () => {
     expect(result.attemptedRelaxations).toEqual(["adjacent-segment"]);
   });
 
-  it("추천 인원과 총예산이 모두 없으면 요청을 거절한다", () => {
+  it("추천 인원과 예산이 모두 없으면 요청을 거절한다", () => {
     expect(() => recommendCreators([creator("C1")], query(null))).toThrow(
-      "totalBudgetKrw와 desiredCreatorCount 중 하나는 필수입니다.",
+      "예산 또는 desiredCreatorCount 중 하나는 필수입니다.",
     );
+  });
+
+  it("총예산과 1인당 예산을 동시에 적용하면 요청을 거절한다", () => {
+    expect(() => recommendCreators(
+      [creator("C1")],
+      query(1_000_000, ["게임"], "nano", 50, null, null, 300_000),
+    )).toThrow("총예산과 1인당 예산은 동시에 적용할 수 없습니다.");
   });
 
   it("입력 순서와 반복 실행에 무관하며 원본을 변경하지 않는다", () => {

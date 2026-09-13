@@ -33,7 +33,7 @@ const sectionCopy: Record<RecommendationSection["tier"], { title: string; descri
   },
   "segment-relaxed": {
     title: "규모를 넓힌 대안",
-    description: "총예산 안에서 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
+    description: "예산 조건과 카테고리는 유지하고 인접한 팔로워 규모까지 살펴봤어요.",
   },
 };
 
@@ -86,20 +86,32 @@ export function ResultsPanel({
   );
   const selectedItems = sections.flatMap((section) => section.items);
   const selectedCosts = selectedItems.map((item) => item.creator.avgCampaignBudgetKrw);
-  const hasOnlyKnownCosts = selectedCosts.every(
-    (cost): cost is number => cost !== null,
-  );
+  const knownSelectedCosts = selectedCosts.filter((cost): cost is number => cost !== null);
+  const hasOnlyKnownCosts = knownSelectedCosts.length === selectedCosts.length;
   const usedBudgetKrw = hasOnlyKnownCosts
-    ? selectedCosts.reduce((sum, cost) => sum + cost, 0)
+    ? knownSelectedCosts.reduce((sum, cost) => sum + cost, 0)
     : null;
-  const budgetStatus = result.appliedQuery.totalBudgetKrw === null || usedBudgetKrw === null
-    ? null
-    : {
-        used: currencyFormatter.format(usedBudgetKrw),
-        remaining: currencyFormatter.format(
+  const budgetStatus = (() => {
+    if (result.appliedQuery.totalBudgetKrw !== null && usedBudgetKrw !== null) {
+      return {
+        primaryLabel: "예상 집행액",
+        primaryValue: currencyFormatter.format(usedBudgetKrw),
+        secondaryLabel: "잔여 예산",
+        secondaryValue: currencyFormatter.format(
           Math.max(0, result.appliedQuery.totalBudgetKrw - usedBudgetKrw),
         ),
       };
+    }
+    if (result.appliedQuery.perCreatorBudgetKrw !== null && hasOnlyKnownCosts) {
+      return {
+        primaryLabel: "1인당 예산 상한",
+        primaryValue: currencyFormatter.format(result.appliedQuery.perCreatorBudgetKrw),
+        secondaryLabel: "후보 중 최고 예상 협업비",
+        secondaryValue: currencyFormatter.format(Math.max(...knownSelectedCosts)),
+      };
+    }
+    return null;
+  })();
 
   return (
     <div className="results-content">
@@ -142,12 +154,12 @@ export function ResultsPanel({
               {sectionIndex === 0 && budgetStatus && (
                 <dl className="budget-status" aria-label="예산 계획 현황">
                   <div>
-                    <dt>예상 집행액</dt>
-                    <dd>{budgetStatus.used}</dd>
+                    <dt>{budgetStatus.primaryLabel}</dt>
+                    <dd>{budgetStatus.primaryValue}</dd>
                   </div>
                   <div>
-                    <dt>잔여 예산</dt>
-                    <dd>{budgetStatus.remaining}</dd>
+                    <dt>{budgetStatus.secondaryLabel}</dt>
+                    <dd>{budgetStatus.secondaryValue}</dd>
                   </div>
                 </dl>
               )}

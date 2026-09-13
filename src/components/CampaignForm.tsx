@@ -2,6 +2,7 @@ import type { FormEvent, RefObject } from "react";
 import {
   CATEGORIES,
   PLATFORMS,
+  type BudgetMode,
   type Category,
   type FollowerSegment,
   type Platform,
@@ -9,6 +10,7 @@ import {
 import { getCampaignGoalProfile } from "../recommendation/goals";
 
 export interface CampaignDraft {
+  budgetMode: BudgetMode;
   budgetManwon: string;
   categories: Category[];
   platform: Platform | "";
@@ -35,6 +37,7 @@ interface CampaignFormProps {
   segmentRef: RefObject<HTMLSelectElement | null>;
   goalRef: RefObject<HTMLInputElement | null>;
   onBudgetChange: (value: string) => void;
+  onBudgetModeChange: (mode: BudgetMode) => void;
   onDesiredCreatorCountChange: (value: string) => void;
   onCategoryChange: (category: Category, checked: boolean) => void;
   onPlatformChange: (platform: Platform | "") => void;
@@ -53,11 +56,13 @@ const segmentOptions: Array<{
   { value: "macro", label: "매크로", range: "10만 명 이상" },
 ];
 
-const formatBudget = (value: string) => {
+const formatBudget = (value: string, mode: BudgetMode) => {
   if (value === "") return "비우려면 추천 인원을 입력해 주세요.";
   if (!/^\d+$/.test(value) || Number(value) <= 0) return "금액을 확인해 주세요.";
-  const totalManwon = new Intl.NumberFormat("ko-KR").format(Number(value));
-  return `총 ${totalManwon}만원 안에서 가장 적합한 조합을 찾아요.`;
+  const manwon = new Intl.NumberFormat("ko-KR").format(Number(value));
+  return mode === "total"
+    ? `총 ${manwon}만원 안에서 가장 적합한 조합을 찾아요.`
+    : `1인당 최대 ${manwon}만원 이하인 후보를 찾아요.`;
 };
 
 function categorySummary(categories: readonly Category[]): string {
@@ -78,6 +83,7 @@ export function CampaignForm({
   segmentRef,
   goalRef,
   onBudgetChange,
+  onBudgetModeChange,
   onDesiredCreatorCountChange,
   onCategoryChange,
   onPlatformChange,
@@ -93,7 +99,7 @@ export function CampaignForm({
     <form className="campaign-form" noValidate onSubmit={onSubmit}>
       <div className="form-heading">
         <h2>추천 조건</h2>
-        <p>추천 인원 또는 총예산 중 하나를 입력하고, 나머지 조건은 필요할 때만 좁혀보세요.</p>
+        <p>추천 인원 또는 예산 중 하나를 입력하고, 나머지 조건은 필요할 때만 좁혀보세요.</p>
       </div>
 
       <div className="compact-filter-grid">
@@ -127,7 +133,27 @@ export function CampaignForm({
           <p className="field-help">{goalProfile.description}</p>
         </div>
 
-        <div className="required-filter-row">
+        <div className="target-filter-row">
+          <div className="field-group">
+            <label htmlFor="segment">크리에이터 규모</label>
+            <select
+              ref={segmentRef}
+              id="segment"
+              name="segment"
+              aria-label="크리에이터 규모"
+              disabled={disabled}
+              value={draft.segment}
+              onChange={(event) => onSegmentChange(event.target.value as FollowerSegment | "")}
+            >
+              <option value="">전체 규모</option>
+              {segmentOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} · {option.range}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="field-group">
             <label htmlFor="desired-creator-count">추천 인원</label>
             <div className="unit-input-wrap">
@@ -156,14 +182,46 @@ export function CampaignForm({
             )}
           </div>
 
-          <div className="field-group">
-            <label htmlFor="budget">총 예산</label>
+          {errors.countOrBudget && (
+            <p id="count-budget-error" className="field-error required-pair-error">{errors.countOrBudget}</p>
+          )}
+        </div>
+
+        <fieldset className="field-group budget-field">
+          <legend>예산</legend>
+          <div className="budget-mode-and-value">
+            <div className="budget-mode-switch" role="radiogroup" aria-label="예산 방식">
+              <label>
+                <input
+                  type="radio"
+                  name="budgetMode"
+                  value="total"
+                  aria-label="총 예산 방식"
+                  checked={draft.budgetMode === "total"}
+                  disabled={disabled}
+                  onChange={() => onBudgetModeChange("total")}
+                />
+                <span>총 예산</span>
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="budgetMode"
+                  value="perCreator"
+                  aria-label="1인당 예산 방식"
+                  checked={draft.budgetMode === "perCreator"}
+                  disabled={disabled}
+                  onChange={() => onBudgetModeChange("perCreator")}
+                />
+                <span>1인당 예산</span>
+              </label>
+            </div>
             <div className="unit-input-wrap">
               <input
                 ref={budgetRef}
                 id="budget"
                 name="budgetManwon"
-                aria-label="총 예산"
+                aria-label={draft.budgetMode === "total" ? "총 예산" : "1인당 예산"}
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
@@ -177,15 +235,12 @@ export function CampaignForm({
               />
               <span aria-hidden="true">만원</span>
             </div>
-            <p id="budget-help" className="field-help">
-              {formatBudget(draft.budgetManwon)}
-            </p>
-            {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
           </div>
-          {errors.countOrBudget && (
-            <p id="count-budget-error" className="field-error required-pair-error">{errors.countOrBudget}</p>
-          )}
-        </div>
+          <p id="budget-help" className="field-help">
+            {formatBudget(draft.budgetManwon, draft.budgetMode)}
+          </p>
+          {errors.budget && <p id="budget-error" className="field-error">{errors.budget}</p>}
+        </fieldset>
 
         <div className="field-group">
           <label htmlFor="platform">플랫폼</label>
@@ -201,26 +256,6 @@ export function CampaignForm({
             <option value="">전체 플랫폼</option>
             {PLATFORMS.map((platform) => (
               <option key={platform} value={platform}>{platform}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field-group">
-          <label htmlFor="segment">크리에이터 규모</label>
-          <select
-            ref={segmentRef}
-            id="segment"
-            name="segment"
-            aria-label="크리에이터 규모"
-            disabled={disabled}
-            value={draft.segment}
-            onChange={(event) => onSegmentChange(event.target.value as FollowerSegment | "")}
-          >
-            <option value="">전체 규모</option>
-            {segmentOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label} · {option.range}
-              </option>
             ))}
           </select>
         </div>

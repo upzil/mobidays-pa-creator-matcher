@@ -194,20 +194,82 @@ a:focus-visible {
   scrollbar-gutter: stable;
 }
 
-.required-filter-row {
+.target-filter-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 14px;
   border-bottom: 1px solid var(--line);
 }
 
-.required-filter-row .field-group {
+.target-filter-row .field-group {
   border-bottom: 0;
 }
 
 .required-pair-error {
   grid-column: 1 / -1;
   margin: -8px 0 14px;
+}
+
+.budget-mode-and-value {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.15fr) minmax(120px, 0.85fr);
+  gap: 10px;
+}
+
+.budget-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.budget-mode-switch label {
+  position: relative;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.budget-mode-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.budget-mode-switch span {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border: 1px solid #aaa69e;
+  background: #fff;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.budget-mode-switch label + label span {
+  border-left: 0;
+}
+
+.budget-mode-switch input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.budget-mode-switch label + label input:checked + span {
+  border-left: 1px solid var(--accent);
+}
+
+.budget-mode-switch input:focus-visible + span {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.budget-mode-switch input:disabled + span {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .goal-slider-control {
@@ -1044,6 +1106,12 @@ a:focus-visible {
 
   .recovery-actions {
     display: grid;
+  }
+}
+
+@media (max-width: 479px) {
+  .budget-mode-and-value {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
