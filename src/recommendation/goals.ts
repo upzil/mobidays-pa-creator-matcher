@@ -4,7 +4,6 @@ export interface CampaignGoalProfile {
   label: string;
   description: string;
   scoringNote: string;
-  weightSummary: string;
   weights: ScoreWeights;
 }
 
@@ -19,7 +18,6 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "노출 확대",
     description: "평균 조회수를 중심으로 실제 도달 가능성을 봐요.",
     scoringNote: "노출 목적에 맞춰 평균 조회수를 가장 크게 반영했어요.",
-    weightSummary: "조회수 40% · 참여율 15%",
     weights: {
       engagement: 0.15,
       views: 0.4,
@@ -32,7 +30,6 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "균형 탐색",
     description: "성과·신뢰·비용을 고르게 비교해요.",
     scoringNote: "특정 지표에 치우치지 않도록 성과·신뢰·비용을 균형 있게 반영했어요.",
-    weightSummary: "참여율 27.5% · 조회수 27.5%",
     weights: {
       engagement: 0.275,
       views: 0.275,
@@ -45,7 +42,6 @@ export const CAMPAIGN_GOAL_PROFILES: Record<CampaignGoalAnchor, CampaignGoalProf
     label: "참여 중심",
     description: "참여율을 중심으로 반응 가능성을 봐요.",
     scoringNote: "참여 중심 설정에 맞춰 참여율을 가장 크게 반영했어요.",
-    weightSummary: "참여율 40% · 조회수 15%",
     weights: {
       engagement: 0.4,
       views: 0.15,
@@ -69,20 +65,6 @@ function interpolateWeights(
     budgetEfficiency:
       from.budgetEfficiency + (to.budgetEfficiency - from.budgetEfficiency) * progress,
   };
-}
-
-function formatPercent(value: number): string {
-  const percent = Math.round(value * 1_000) / 10;
-  return Number.isInteger(percent) ? `${percent}%` : `${percent.toFixed(1)}%`;
-}
-
-function summarizeAdjustableWeights(weights: ScoreWeights): string {
-  const entries = [
-    { label: "참여율", value: weights.engagement },
-    { label: "조회수", value: weights.views },
-  ].sort((a, b) => b.value - a.value);
-
-  return entries.map(({ label, value }) => `${label} ${formatPercent(value)}`).join(" · ");
 }
 
 export function getCampaignGoalProfile(position: number): CampaignGoalProfile {
@@ -121,7 +103,6 @@ export function getCampaignGoalProfile(position: number): CampaignGoalProfile {
     label,
     description,
     scoringNote,
-    weightSummary: summarizeAdjustableWeights(weights),
     weights,
   };
 }

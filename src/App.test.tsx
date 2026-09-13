@@ -163,8 +163,13 @@ describe("App", () => {
     expect(screen.getByText("교육채널")).toBeInTheDocument();
     expect(screen.getByText("견적 확인 필요")).toBeInTheDocument();
     expect(screen.getByText("균형 탐색")).toBeInTheDocument();
-    expect(screen.getByText(/조정 가중치 · 참여율 27.5% · 조회수 27.5%/)).toBeInTheDocument();
-    expect(screen.getByText(/평점 20% · 경험 15% · 예산 10%는 고정/)).toBeInTheDocument();
+    expect(screen.getByText("성과·신뢰·비용을 고르게 비교해요.")).toBeInTheDocument();
+    const recommendedCreator = screen.getByRole("heading", { name: "게임채널" }).closest("article") as HTMLElement;
+    expect(within(recommendedCreator).getByText("8,000명")).toBeInTheDocument();
+    expect(within(recommendedCreator).getByText("3,000회")).toBeInTheDocument();
+    expect(within(recommendedCreator).getByText("진행한 캠페인")).toBeInTheDocument();
+    expect(within(recommendedCreator).queryByText("8천")).not.toBeInTheDocument();
+    expect(within(recommendedCreator).queryByText("3천")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("총 예산"), "0");
     expect(screen.getByText(/조건이 변경됐어요/)).toBeInTheDocument();
@@ -184,13 +189,21 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByText("노출 중심")).toBeInTheDocument();
-    expect(screen.getByText(/조정 가중치 · 조회수 40% · 참여율 15%/)).toBeInTheDocument();
+    expect(screen.getByLabelText("캠페인 목적")).toHaveAttribute(
+      "aria-valuetext",
+      "노출 중심. 평균 조회수 비중을 높여 더 넓은 도달 가능성을 봐요.",
+    );
 
     fireEvent.change(screen.getByLabelText("캠페인 목적"), { target: { value: "100" } });
     await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
 
     expect(await screen.findByText("참여 중심")).toBeInTheDocument();
-    expect(screen.getByText(/조정 가중치 · 참여율 40% · 조회수 15%/)).toBeInTheDocument();
+    expect(screen.getByLabelText("캠페인 목적")).toHaveAttribute(
+      "aria-valuetext",
+      "참여 중심. 참여율 비중을 높여 더 적극적인 반응 가능성을 봐요.",
+    );
+    expect(screen.queryByText(/조정 가중치/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/고정 반영/)).not.toBeInTheDocument();
   });
 
   it("추천 인원으로 노출 후보 수를 제한한다", async () => {

@@ -264,15 +264,6 @@ a:focus-visible {
   text-align: right;
 }
 
-.goal-slider-weights {
-  margin: 5px 0 0;
-  color: var(--accent-dark);
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
-}
-
 .field-group select,
 .unit-input-wrap input,
 .category-select summary {
@@ -805,13 +796,6 @@ a:focus-visible {
   font-size: 0.86rem;
   font-weight: 750;
   overflow-wrap: anywhere;
-}
-
-.metric small {
-  display: block;
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 0.65rem;
 }
 
 .reason-block {

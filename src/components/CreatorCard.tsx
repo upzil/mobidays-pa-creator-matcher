@@ -1,10 +1,6 @@
 import type { RecommendedCreator } from "../domain/types";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
-const compactFormatter = new Intl.NumberFormat("ko-KR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
 const currencyFormatter = new Intl.NumberFormat("ko-KR", {
   style: "currency",
   currency: "KRW",
@@ -22,12 +18,11 @@ interface CreatorCardProps {
   rank: number;
 }
 
-function Metric({ label, value, detail }: { label: string; value: string; detail?: string }) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric">
       <dt>{label}</dt>
       <dd>{value}</dd>
-      {detail && <small>{detail}</small>}
     </div>
   );
 }
@@ -53,11 +48,11 @@ export function CreatorCard({ item, rank }: CreatorCardProps) {
       </header>
 
       <dl className="metric-grid">
-        <Metric label="팔로워" value={compactFormatter.format(creator.followers)} detail={`${numberFormatter.format(creator.followers)}명`} />
-        <Metric label="평균 조회수" value={compactFormatter.format(creator.avgViewCount)} detail={`${numberFormatter.format(creator.avgViewCount)}회`} />
+        <Metric label="팔로워" value={`${numberFormatter.format(creator.followers)}명`} />
+        <Metric label="평균 조회수" value={`${numberFormatter.format(creator.avgViewCount)}회`} />
         <Metric label="참여율" value={`${creator.engagementRate.toFixed(1)}%`} />
         <Metric label="광고주 평점" value={creator.advertiserRating === null ? "이력 없음" : `${creator.advertiserRating.toFixed(1)} / 5.0`} />
-        <Metric label="캠페인" value={`${numberFormatter.format(creator.totalCampaignCount)}회`} />
+        <Metric label="진행한 캠페인" value={`${numberFormatter.format(creator.totalCampaignCount)}회`} />
         <Metric
           label="평균 협업비"
           value={creator.avgCampaignBudgetKrw === null ? "견적 확인 필요" : currencyFormatter.format(creator.avgCampaignBudgetKrw)}
