@@ -11,8 +11,10 @@ export const CATEGORIES = [
   "피트니스",
 ] as const;
 
+export const PLATFORMS = ["유튜브", "인스타그램"] as const;
+
 export type Category = (typeof CATEGORIES)[number];
-export type Platform = "유튜브" | "인스타그램";
+export type Platform = (typeof PLATFORMS)[number];
 export type FollowerSegment = "nano" | "micro" | "macro";
 export type MatchTier =
   | "exact"
@@ -74,6 +76,7 @@ export interface ParsedCreators {
 export interface RecommendationQuery {
   totalBudgetKrw: number | null;
   categories: readonly Category[];
+  platform: Platform | null;
   segment: FollowerSegment | null;
   goalPosition: number;
   desiredCreatorCount: number | null;

@@ -1,14 +1,17 @@
 import type { FormEvent, RefObject } from "react";
 import {
   CATEGORIES,
+  PLATFORMS,
   type Category,
   type FollowerSegment,
+  type Platform,
 } from "../domain/types";
 import { getCampaignGoalProfile } from "../recommendation/goals";
 
 export interface CampaignDraft {
   budgetManwon: string;
   categories: Category[];
+  platform: Platform | "";
   segment: FollowerSegment | "";
   goalPosition: number;
   desiredCreatorCount: string;
@@ -28,11 +31,13 @@ interface CampaignFormProps {
   budgetRef: RefObject<HTMLInputElement | null>;
   desiredCreatorCountRef: RefObject<HTMLInputElement | null>;
   categoryRef: RefObject<HTMLElement | null>;
+  platformRef: RefObject<HTMLSelectElement | null>;
   segmentRef: RefObject<HTMLSelectElement | null>;
   goalRef: RefObject<HTMLInputElement | null>;
   onBudgetChange: (value: string) => void;
   onDesiredCreatorCountChange: (value: string) => void;
   onCategoryChange: (category: Category, checked: boolean) => void;
+  onPlatformChange: (platform: Platform | "") => void;
   onSegmentChange: (segment: FollowerSegment | "") => void;
   onGoalChange: (goalPosition: number) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -69,11 +74,13 @@ export function CampaignForm({
   budgetRef,
   desiredCreatorCountRef,
   categoryRef,
+  platformRef,
   segmentRef,
   goalRef,
   onBudgetChange,
   onDesiredCreatorCountChange,
   onCategoryChange,
+  onPlatformChange,
   onSegmentChange,
   onGoalChange,
   onSubmit,
@@ -179,6 +186,24 @@ export function CampaignForm({
           {errors.countOrBudget && (
             <p id="count-budget-error" className="field-error required-pair-error">{errors.countOrBudget}</p>
           )}
+        </div>
+
+        <div className="field-group">
+          <label htmlFor="platform">플랫폼</label>
+          <select
+            ref={platformRef}
+            id="platform"
+            name="platform"
+            aria-label="플랫폼"
+            disabled={disabled}
+            value={draft.platform}
+            onChange={(event) => onPlatformChange(event.target.value as Platform | "")}
+          >
+            <option value="">전체 플랫폼</option>
+            {PLATFORMS.map((platform) => (
+              <option key={platform} value={platform}>{platform}</option>
+            ))}
+          </select>
         </div>
 
         <div className="field-group">

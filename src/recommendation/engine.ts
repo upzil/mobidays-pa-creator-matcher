@@ -515,6 +515,12 @@ function assertQuery(query: RecommendationQuery): void {
     throw new RangeError("totalBudgetKrw는 null이거나 0보다 큰 안전한 정수여야 합니다.");
   }
   if (
+    query.platform !== null &&
+    !["유튜브", "인스타그램"].includes(query.platform)
+  ) {
+    throw new RangeError("지원하지 않는 플랫폼입니다.");
+  }
+  if (
     query.segment !== null &&
     !["nano", "micro", "macro"].includes(query.segment)
   ) {
@@ -548,14 +554,18 @@ export function recommendCreators(
   const appliedQuery: RecommendationQuery = {
     totalBudgetKrw: query.totalBudgetKrw,
     categories: [...query.categories],
+    platform: query.platform,
     segment: query.segment,
     goalPosition: query.goalPosition,
     desiredCreatorCount: query.desiredCreatorCount,
   };
   const categories = new Set(query.categories);
-  const relevant = query.categories.length === 0
+  const platformPool = query.platform === null
     ? [...creators]
-    : creators.filter((creator) => categories.has(creator.category));
+    : creators.filter((creator) => creator.platform === query.platform);
+  const relevant = query.categories.length === 0
+    ? platformPool
+    : platformPool.filter((creator) => categories.has(creator.category));
   const sameSegment = query.segment === null
     ? relevant
     : relevant.filter((creator) => creator.segment === query.segment);
@@ -665,7 +675,7 @@ export function recommendCreators(
     sections: [],
     attemptedRelaxations: ["adjacent-segment", "unknown-cost"],
     diagnostics: [
-      "선택한 카테고리·규모에서 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 규모 또는 카테고리를 변경해 주세요.",
+      "선택한 플랫폼·카테고리·규모에서 총예산을 지키는 조합을 찾지 못했어요. 총예산을 높이거나 추천 인원, 플랫폼, 규모 또는 카테고리를 변경해 주세요.",
     ],
   };
 }

@@ -2,6 +2,7 @@ import Papa from "papaparse";
 
 import {
   CATEGORIES,
+  PLATFORMS,
   type Category,
   type Creator,
   type ParseDiagnostic,
@@ -26,7 +27,7 @@ const REQUIRED_HEADERS = [
 ] as const satisfies readonly (keyof RawCreatorRow)[];
 
 const CATEGORY_SET = new Set<string>(CATEGORIES);
-const PLATFORM_SET = new Set<string>(["유튜브", "인스타그램"] satisfies Platform[]);
+const PLATFORM_SET = new Set<string>(PLATFORMS);
 
 function fatal(message: string): never {
   throw new Error(`크리에이터 CSV를 사용할 수 없습니다: ${message}`);

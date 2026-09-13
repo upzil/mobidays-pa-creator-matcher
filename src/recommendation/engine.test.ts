@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { parseCreatorsCsv } from "../data/creatorCsv";
-import type { Category, Creator, FollowerSegment } from "../domain/types";
+import type { Category, Creator, FollowerSegment, Platform } from "../domain/types";
 import { getCampaignGoalProfile } from "./goals";
 import {
   getFollowerSegment,
@@ -38,8 +38,9 @@ function query(
   segment: FollowerSegment | null = "nano",
   goalPosition = 50,
   desiredCreatorCount: number | null = null,
+  platform: Platform | null = null,
 ) {
-  return { totalBudgetKrw, categories, segment, goalPosition, desiredCreatorCount } as const;
+  return { totalBudgetKrw, categories, platform, segment, goalPosition, desiredCreatorCount } as const;
 }
 
 describe("getFollowerSegment", () => {
@@ -76,6 +77,21 @@ describe("recommendCreators", () => {
       segment: null,
       desiredCreatorCount: null,
     });
+  });
+
+  it("선택한 플랫폼의 크리에이터만 추천한다", () => {
+    const result = recommendCreators(
+      [
+        creator("YOUTUBE", { platform: "유튜브" }),
+        creator("INSTAGRAM", { platform: "인스타그램" }),
+      ],
+      query(null, [], null, 50, 5, "인스타그램"),
+    );
+
+    expect(result.sections[0].items.map(({ creator }) => creator.creatorId)).toEqual([
+      "INSTAGRAM",
+    ]);
+    expect(result.appliedQuery.platform).toBe("인스타그램");
   });
 
   it("추천 인원은 우선순위가 높은 섹션부터 전체 합계로 제한한다", () => {

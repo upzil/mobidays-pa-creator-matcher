@@ -48,6 +48,7 @@ interface ResultsPanelProps {
   onSortChange: (mode: SortMode) => void;
   onFocusBudget: () => void;
   onFocusCategories: () => void;
+  onFocusPlatform: () => void;
   onFocusSegment: () => void;
 }
 
@@ -62,6 +63,7 @@ export function ResultsPanel({
   onSortChange,
   onFocusBudget,
   onFocusCategories,
+  onFocusPlatform,
   onFocusSegment,
 }: ResultsPanelProps) {
   if (!result) {
@@ -178,6 +180,7 @@ export function ResultsPanel({
             <div className="recovery-actions" aria-label="조건 수정 바로가기">
               <button type="button" onClick={onFocusBudget}>예산 조정하기</button>
               <button type="button" onClick={onFocusSegment}>규모 바꾸기</button>
+              <button type="button" onClick={onFocusPlatform}>플랫폼 바꾸기</button>
               <button type="button" onClick={onFocusCategories}>카테고리 수정하기</button>
             </div>
           </section>

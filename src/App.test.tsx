@@ -76,6 +76,7 @@ describe("App", () => {
     expect(screen.getByLabelText("총 예산")).toBeEnabled();
     expect(screen.getByLabelText("추천 인원")).toHaveValue(null);
     expect(screen.getByLabelText("캠페인 목적")).toHaveValue("50");
+    expect(screen.getByLabelText("플랫폼")).toHaveValue("");
     expect(screen.getByLabelText(/크리에이터 규모/)).toHaveValue("");
     expect(screen.getByText("전체 카테고리")).toBeInTheDocument();
     expect(screen.queryByText("둘 중 하나 필수")).not.toBeInTheDocument();
@@ -113,6 +114,22 @@ describe("App", () => {
     expect(screen.queryByLabelText("예산 계획 현황")).not.toBeInTheDocument();
     expect(screen.queryByText("APPLIED CONDITIONS")).not.toBeInTheDocument();
     expect(screen.queryByText(/선택해 주세요/)).not.toBeInTheDocument();
+  });
+
+  it("플랫폼을 선택하면 해당 플랫폼의 크리에이터만 추천한다", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("heading", { name: "전체 크리에이터" });
+
+    await user.type(screen.getByLabelText("추천 인원"), "3");
+    await user.selectOptions(screen.getByLabelText("플랫폼"), "인스타그램");
+    await user.click(screen.getByRole("button", { name: "크리에이터 추천받기" }));
+
+    expect(await screen.findByRole("heading", { name: "조건에 맞는 추천" })).toBeInTheDocument();
+    const recommendationSection = screen.getByRole("heading", { name: "조건에 맞는 추천" }).closest("section") as HTMLElement;
+    expect(within(recommendationSection).getByText("새로운채널")).toBeInTheDocument();
+    expect(within(recommendationSection).queryByText("게임채널")).not.toBeInTheDocument();
+    expect(within(recommendationSection).queryByText("교육채널")).not.toBeInTheDocument();
   });
 
   it("유효 조건으로 총예산 안의 비용 확인 가능 후보만 추천한다", async () => {

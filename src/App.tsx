@@ -7,6 +7,7 @@ import type {
   Category,
   Creator,
   FollowerSegment,
+  Platform,
   RecommendationQuery,
   RecommendationResult,
   SortMode,
@@ -18,6 +19,7 @@ import "./styles.css";
 const initialDraft: CampaignDraft = {
   budgetManwon: "",
   categories: [],
+  platform: "",
   segment: "",
   goalPosition: 50,
   desiredCreatorCount: "",
@@ -52,6 +54,7 @@ function draftMatchesQuery(draft: CampaignDraft, query: RecommendationQuery | nu
   if (!query) return false;
   return (
     (draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000) === query.totalBudgetKrw &&
+    (draft.platform || null) === query.platform &&
     (draft.segment || null) === query.segment &&
     draft.goalPosition === query.goalPosition &&
     (draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount)) === query.desiredCreatorCount &&
@@ -76,6 +79,7 @@ function App() {
   const desiredCreatorCountRef = useRef<HTMLInputElement>(null);
   const goalRef = useRef<HTMLInputElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
+  const platformRef = useRef<HTMLSelectElement>(null);
   const segmentRef = useRef<HTMLSelectElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
 
@@ -144,6 +148,7 @@ function App() {
     const query: RecommendationQuery = {
       totalBudgetKrw: draft.budgetManwon === "" ? null : Number(draft.budgetManwon) * 10_000,
       categories: draft.categories,
+      platform: draft.platform || null,
       segment: draft.segment || null,
       goalPosition: draft.goalPosition,
       desiredCreatorCount: draft.desiredCreatorCount === "" ? null : Number(draft.desiredCreatorCount),
@@ -214,6 +219,7 @@ function App() {
             desiredCreatorCountRef={desiredCreatorCountRef}
             goalRef={goalRef}
             categoryRef={categoryRef}
+            platformRef={platformRef}
             segmentRef={segmentRef}
             onBudgetChange={(budgetManwon) => {
               setDraft((current) => ({ ...current, budgetManwon }));
@@ -235,6 +241,9 @@ function App() {
                   ? [...current.categories, category]
                   : current.categories.filter((item) => item !== category),
               }));
+            }}
+            onPlatformChange={(platform: Platform | "") => {
+              setDraft((current) => ({ ...current, platform }));
             }}
             onSegmentChange={(segment: FollowerSegment | "") => {
               setDraft((current) => ({ ...current, segment }));
@@ -272,6 +281,7 @@ function App() {
               onSortChange={handleSortChange}
               onFocusBudget={() => budgetRef.current?.focus()}
               onFocusCategories={() => categoryRef.current?.focus()}
+              onFocusPlatform={() => platformRef.current?.focus()}
               onFocusSegment={() => segmentRef.current?.focus()}
             />
           )}
